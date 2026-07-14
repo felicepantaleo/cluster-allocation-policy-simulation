@@ -178,6 +178,47 @@ def user_hold_timeline(alloc_records_by_policy: dict[str, list[dict]],
     plt.close(fig)
 
 
+def wait_vs_users(results: dict[str, dict[float, list[dict]]],
+                  users_at_scale: dict[float, int], out_png):
+    """Two panels sharing x: p95 wait of all logical jobs (top) and of the
+    1-GPU member tier (bottom) vs number of users. Line = mean over trace
+    seeds, band = min to max across seeds."""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 6.5), sharex=True,
+                                   facecolor=SURFACE)
+    for ax in (ax1, ax2):
+        _style_axes(ax)
+    colors = {name: c for name, c in zip(results, SERIES)}
+    scales = sorted(users_at_scale)
+    xs = [users_at_scale[s] for s in scales]
+    for key, ax in (("wait_p95_min", ax1), ("inter_p95_min", ax2)):
+        for policy, by_scale in results.items():
+            mean, lo, hi = [], [], []
+            for s in scales:
+                vals = [r[key] for r in by_scale[s] if r[key] is not None]
+                if not vals:
+                    mean.append(np.nan), lo.append(np.nan), hi.append(np.nan)
+                    continue
+                mean.append(float(np.mean(vals)))
+                lo.append(min(vals))
+                hi.append(max(vals))
+            ax.plot(xs, mean, color=colors[policy], linewidth=2.0,
+                    marker="o", markersize=4.5, label=policy)
+            ax.fill_between(xs, lo, hi, color=colors[policy], alpha=0.15,
+                            linewidth=0)
+        ax.set_ylim(bottom=0)
+    ax1.set_ylabel("p95 wait, all jobs (min)", color=INK, fontsize=10)
+    ax2.set_ylabel("p95 wait, 1-GPU tier (min)", color=INK, fontsize=10)
+    ax2.set_xlabel("number of users (per-user submission rate fixed)",
+                   color=INK, fontsize=10)
+    ax1.set_title("Waiting time vs number of users "
+                  "(band: min to max over trace seeds)",
+                  color=INK, fontsize=11, loc="left")
+    ax1.legend(frameon=False, fontsize=9, labelcolor=INK, ncol=2)
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def occupancy_timeline(snapshots_by_policy: dict[str, list[dict]],
                        gpu_pools: list[str], out_png,
                        shade_windows_h: list[tuple[float, float]] | None = None):

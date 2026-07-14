@@ -75,6 +75,29 @@ event log.
   a factor 2 to 4.5 less, and their holds turn over at epoch boundaries
   instead of persisting.
 
+## Waiting time vs number of users
+
+`phase1/wait_vs_users.png` and `phase1/sweep.md` (user counts scaled 0.5x
+to 1.5x of the calibrated 82, per-user rates fixed, 3 trace seeds per
+point, all policies on the identical trace at each point):
+
+- For all continuous policies the overall p95 wait grows roughly linearly
+  with the user count (FCFS: 91 min at 41 users to 452 min at 123). Idle
+  reclaim buys a near-constant offset, not a slope change.
+- The 1-GPU member tier is where policies separate. Under the current
+  policy its p95 wait grows from 10 to 305 minutes over the sweep; the
+  reserve alone (ngt_principles) barely helps at high load (253 min at 123
+  users) because parked singles absorb the headroom. With reserve plus
+  reclaim the tier stays essentially flat: 3 to 55 minutes across a 3x
+  load range. P1 survives load growth only with both mechanisms.
+- The planning cycle's wait is set by the decision cadence, not by
+  contention: p95 sits at 420 to 500 minutes at every load, and even at
+  half load 44% of jobs never start under the 4 h median patience
+  assumption. Epoch frequency, not capacity, is its binding constraint.
+- Caveat: waits are among started jobs, and the never-started fraction
+  rises with load (FCFS: 6.5% at 41 users, 44% at 123), so high-load p95
+  values are censored from above; sweep.json carries the fractions.
+
 ## What this does not yet cover
 
 Cordon-fraction sensitivity sweep, the gaming externality sweep (K-way
