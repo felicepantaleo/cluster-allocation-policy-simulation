@@ -1,0 +1,103 @@
+# Phase 1 experiment: baseline FCFS-Pending vs idle-reclaim, 14 simulated days
+# (week 1 warmup, week 2 measured). All quantities here are assumptions until
+# the real event log arrives; each is tagged A (assumed) or G (ground truth
+# from the kickoff).
+
+seed: 20260714          # trace seed; change for replicate runs
+horizon_days: 14
+warmup_days: 7
+snapshot_interval_s: 600
+
+cluster:
+  # G: pool shapes from the kickoff. A: the MIG carve (one NVL node split
+  # into a 3g.47gb half and a 1g.12gb half) and the CPU node-count split
+  # (48 CPU nodes so that GPU + CPU nodes total 73).
+  pools:
+    h100nvl:      {num_nodes: 11, gpus_per_node: 8,  vcpu_per_node: 184, mem_per_node: 1440, granularity: partial}
+    mig3g:        {num_nodes: 1,  gpus_per_node: 12, vcpu_per_node: 138, mem_per_node: 1080, granularity: partial}
+    mig1g:        {num_nodes: 1,  gpus_per_node: 14, vcpu_per_node: 46,  mem_per_node: 360,  granularity: partial}
+    h100sxm:      {num_nodes: 6,  gpus_per_node: 4,  vcpu_per_node: 60,  mem_per_node: 960,  granularity: whole_node_multi_gpu}
+    l40s:         {num_nodes: 7,  gpus_per_node: 4,  vcpu_per_node: 124, mem_per_node: 1440, granularity: partial}
+    highcore384:  {num_nodes: 8,  gpus_per_node: 0,  vcpu_per_node: 764, mem_per_node: 1536, granularity: whole_node, socket_vcpu: 382}
+    cpuintensive: {num_nodes: 24, gpus_per_node: 0,  vcpu_per_node: 380, mem_per_node: 768,  granularity: whole_node, socket_vcpu: 190}
+    highfreq:     {num_nodes: 8,  gpus_per_node: 0,  vcpu_per_node: 124, mem_per_node: 512,  granularity: whole_node, socket_vcpu: 62}
+    memintensive: {num_nodes: 8,  gpus_per_node: 0,  vcpu_per_node: 190, mem_per_node: 2048, granularity: whole_node, socket_vcpu: 95}
+
+gpu_pools: [h100nvl, h100sxm, l40s, mig3g, mig1g]
+
+# NGT allocation principles (see PRINCIPLES.md). P2: target charged GPU-hour
+# split across working packages. Users are assigned to WPs with these
+# probabilities too (A, until the real membership list is known).
+wp_targets: {WP1: 0.30, WP2: 0.30, WP3: 0.30, WP4: 0.10}
+
+# P3: charged GPU time = wall time x GPUs x model correction factor.
+# A: placeholder factors relative to H100 = 1.0; PMC fixes the real ones.
+gpu_charge_factor:
+  h100nvl: 1.0
+  h100sxm: 1.0
+  l40s: 0.35
+  mig3g: 0.40
+  mig1g: 0.15
+
+workload:
+  # A: user counts and rates, tuned so weekday working hours saturate the
+  # H100 pools and backlog persists into Saturday evening (validation below).
+  users:
+    trainers:  {count: 26, jobs_per_day: 3.6}
+    devs:      {count: 26, jobs_per_day: 3.0}
+    hoarders:  {count: 6,  jobs_per_day: 0.6}
+    cpu_batch: {count: 24, jobs_per_day: 4.0}
+  diurnal:
+    work_hours: [9, 18]
+    weights: {work: 1.0, evening: 0.45, night: 0.12}
+    weekend_factor: 0.5
+  gaming:
+    prob: 0.35        # G-ish: multi-Pending observed; A: the rate
+    prob_dev: 0.25
+    prob_hoard: 0.50
+    k_probs: {2: 0.7, 3: 0.3}
+  patience:
+    median_h: 4.0
+    sigma: 1.0
+  cordons:
+    # A: exp gaps + lognormal windows; time-average cordoned fraction
+    # duration/(gap+duration) = 36/216 = 1/6 matches the observed ~12/73.
+    mean_gap_h: 180
+    duration_median_h: 36
+    duration_sigma: 0.5
+
+policies:
+  fcfs_pending: {}
+  idle_reclaim: {util_thresh: 0.05, idle_after_s: 1800}
+  # P1-P5 (PRINCIPLES.md): reserve = GPUs per pool kept free for the
+  # guaranteed 1-GPU member tier; multi-GPU capped at 24 h; WP fair share
+  # over a 72 h sliding window; intra-WP recycling within 5% of target.
+  ngt_principles: &ngt
+    reserve: {h100nvl: 8, l40s: 4}
+    multi_gpu_cap_h: 24
+    usage_window_h: 72
+    fair_tolerance: 0.05
+  ngt_principles_reclaim:
+    <<: *ngt
+    util_thresh: 0.05
+    idle_after_s: 1800
+  # P6: 12:00 daily decision for jobs longer than 8 h; 3 decision points
+  # per day for jobs up to 8 h; 1-GPU tier stays continuous.
+  planning_cycle:
+    <<: *ngt
+    tiers:
+      - {max_h: 8, decisions_per_day: 3}
+      - {max_h: 100000, decisions_per_day: 1}
+
+engine:
+  seed: 42
+  resubmit_reaction_median_s: 600
+  resubmit_reaction_sigma: 0.8
+  resubmit_patience_s: 21600
+
+validation:
+  # G: Saturday 18:00 to 19:35, second week (hour 306 to 307.58 from Monday
+  # 00:00 epoch): 8 requests pending 15 to 71 min, zero allocatable, ~12/73
+  # nodes cordoned. Probe for idle-held H100s: Wednesday 15:00 week 2.
+  saturday_window_h: [306.0, 307.583]
+  idle_probe_h: 231.0
