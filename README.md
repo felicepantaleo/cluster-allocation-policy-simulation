@@ -95,6 +95,13 @@ member sessions), `scenarios/session_rush.yaml` (twelve members opening
 (bursts of few-hour multi-GPU trainings under FCFS, fair share, and the
 planning cycle). The schema is documented in `clustersim/scenario.py`.
 
+`scenarios/realistic_week.yaml` is the full-scale case: the current GPU
+topology and 58 users in the calibrated composition (26 trainers, 26
+devs, 6 hoarders across the WPs), 727 requests over one week, cordon
+windows included. It is generated (and regenerable with different seeds
+or rates) by `python -m clustersim.realistic_week --config
+config/phase1.yaml`, and stays a plain editable YAML.
+
 ## Assumptions vs ground truth
 
 The config tags each block: G = ground truth from the PMC kickoff (pool

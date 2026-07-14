@@ -337,9 +337,11 @@ def scenario_timeline(scenario_name: str, policy_name: str,
     users = sorted({(r["wp"], r["user"]) for r in req_recs})
     rows = {u: i for i, u in enumerate(users)}
     max_g = max((a["held_gpus"] for a in alloc_recs), default=1)
+    dense = len(users) > 16  # compact styling for realistic-scale casts
+    row_h = 0.30 if dense else 0.62
 
     fig, (ax, ax2) = plt.subplots(
-        2, 1, figsize=(11, 0.62 * len(users) + 3.2), sharex=True,
+        2, 1, figsize=(11, row_h * len(users) + 3.2), sharex=True,
         facecolor=SURFACE,
         gridspec_kw={"height_ratios": [max(len(users), 3), 4]})
     for a in (ax, ax2):
@@ -357,25 +359,30 @@ def scenario_timeline(scenario_name: str, policy_name: str,
             ax.fill_between([p0, p1], y - 0.08, y + 0.08, color=c, alpha=0.25,
                             linewidth=0)
         if r["outcome"] == "cancelled_patience":
-            ax.plot(p1, y, marker="o", mfc="none", mec=INK, markersize=6,
-                    mew=1.2, linestyle="none")
+            ax.plot(p1, y, marker="o", mfc="none", mec=INK,
+                    markersize=4 if dense else 6, mew=1.0 if dense else 1.2,
+                    linestyle="none")
     for a in alloc_recs:
         y = rows[(a["wp"], a["user"])]
         c = WP_COLORS.get(a["wp"], MUTED)
         h = 0.12 + 0.30 * a["held_gpus"] / max_g
         ax.fill_between([d(a["start"]), d(a["end"])], y - h, y + h, color=c,
                         alpha=0.85, linewidth=0.5, edgecolor=SURFACE)
-        if d(a["end"]) - d(a["start"]) > 0.08 and a["held_gpus"] > 1:
+        wide = d(a["end"]) - d(a["start"]) > (0.12 if dense else 0.08)
+        if wide and a["held_gpus"] > (3 if dense else 1):
             ax.annotate(str(a["held_gpus"]),
                         xy=((d(a["start"]) + d(a["end"])) / 2, y),
-                        ha="center", va="center", fontsize=7.5, color=SURFACE,
+                        ha="center", va="center",
+                        fontsize=6 if dense else 7.5, color=SURFACE,
                         fontweight="bold")
         if a["end_reason"] in ("reclaimed", "time_capped"):
-            ax.plot(d(a["end"]), y, marker="x", color=INK, markersize=6,
-                    mew=1.4, linestyle="none")
+            ax.plot(d(a["end"]), y, marker="x", color=INK,
+                    markersize=4 if dense else 6, mew=1.1 if dense else 1.4,
+                    linestyle="none")
 
     ax.set_yticks([rows[u] for u in users],
-                  [f"{user} ({wp})" for wp, user in users], fontsize=9)
+                  [f"{user} ({wp})" for wp, user in users],
+                  fontsize=6.5 if dense else 9)
     ax.set_ylim(-0.7, len(users) - 0.3)
     ax.invert_yaxis()
     ax.set_title(f"{scenario_name}: {policy_name}", color=INK, fontsize=11,
