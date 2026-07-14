@@ -102,6 +102,82 @@ def gpu_hours_bars(util_by_policy: dict[str, dict], pools: list[str], out_png):
     plt.close(fig)
 
 
+def _hold_series(allocs: list[dict], horizon_days: float):
+    """Step series of GPUs held over time from allocation spans."""
+    events: list[tuple[float, int]] = []
+    for a in allocs:
+        events.append((a["start"], a["held_gpus"]))
+        events.append((a["end"], -a["held_gpus"]))
+    events.sort()
+    t, y = [0.0], [0]
+    level = 0
+    for time, delta in events:
+        level += delta
+        t.append(time / 86400.0)
+        y.append(level)
+    t.append(horizon_days)
+    y.append(level)
+    return np.array(t), np.array(y)
+
+
+def user_hold_timeline(alloc_records_by_policy: dict[str, list[dict]],
+                       gpu_pools: list[str], horizon_days: float, out_png,
+                       top_n: int = 6):
+    """Small multiples, one row per heavy holder: GPUs held vs time under
+    two policies. Users are ranked by idle-held GPU-hours (held minus used)
+    under the FIRST policy, which selects the members parking big
+    allocations rather than the legitimate heavy trainers."""
+    policies = list(alloc_records_by_policy)
+    base = policies[0]
+    pools = set(gpu_pools)
+
+    def gpu_allocs(policy, user=None):
+        return [a for a in alloc_records_by_policy[policy]
+                if a["pool"] in pools and (user is None or a["user"] == user)]
+
+    idle_held: dict[str, float] = {}
+    for a in gpu_allocs(base):
+        idle_held[a["user"]] = idle_held.get(a["user"], 0.0) + (
+            a["held_gpu_s"] - a["used_gpu_s"])
+    top = [u for u, _ in sorted(idle_held.items(), key=lambda kv: -kv[1])[:top_n]]
+
+    colors = {name: c for name, c in zip(policies, (BLUE, VIOLET))}
+    fig, axes = plt.subplots(len(top), 1, figsize=(10, 1.25 * len(top) + 1.2),
+                             sharex=True, facecolor=SURFACE)
+    for ax, user in zip(axes, top):
+        _style_axes(ax)
+        ymax = 4
+        for policy in policies:
+            allocs = gpu_allocs(policy, user)
+            t, y = _hold_series(allocs, horizon_days)
+            ax.fill_between(t, y, step="post", color=colors[policy], alpha=0.35,
+                            linewidth=0)
+            ax.step(t, y, where="post", color=colors[policy], linewidth=1.4)
+            ymax = max(ymax, y.max() if len(y) else 0)
+        ax.set_ylim(0, ymax * 1.25)
+        info = next(iter(gpu_allocs(base, user)), {})
+        ax.set_ylabel(f"{user}\n({info.get('kind', '?')}, {info.get('wp', '?')})",
+                      rotation=0, ha="right", va="center", fontsize=9, color=INK)
+        totals = [sum(a["held_gpu_s"] for a in gpu_allocs(p, user)) / H
+                  for p in policies]
+        ax.annotate(f"held {totals[0]:.0f} vs {totals[1]:.0f} GPU-h",
+                    xy=(1.0, 0.82), xycoords="axes fraction", ha="right",
+                    fontsize=8.5, color=MUTED)
+    axes[0].set_title(
+        f"GPUs held by the heaviest idle holders: {policies[0]} vs {policies[1]}",
+        color=INK, fontsize=11, loc="left")
+    handles = [plt.Line2D([], [], color=colors[p], linewidth=3, label=p)
+               for p in policies]
+    axes[0].legend(handles=handles, frameon=False, fontsize=9, labelcolor=INK,
+                   loc="upper right", bbox_to_anchor=(1.0, 1.6), ncol=2)
+    axes[-1].set_xlabel("simulation time (days, day 0 = Monday)",
+                        color=INK, fontsize=10)
+    axes[-1].set_xlim(0, horizon_days)
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def occupancy_timeline(snapshots_by_policy: dict[str, list[dict]],
                        gpu_pools: list[str], out_png,
                        shade_windows_h: list[tuple[float, float]] | None = None):

@@ -127,6 +127,7 @@ def main() -> None:
     waits_by_policy: dict[str, list[float]] = {}
     snapshots_by_policy: dict[str, list[dict]] = {}
     util_by_policy: dict[str, dict] = {}
+    allocs_by_policy: dict[str, list[dict]] = {}
     validation: dict[str, dict] = {}
 
     for pname, pparams in config["policies"].items():
@@ -169,9 +170,16 @@ def main() -> None:
         waits_by_policy[pname] = waits
         snapshots_by_policy[pname] = engine.snapshots
         util_by_policy[pname] = m["utilization_by_pool"]
+        allocs_by_policy[pname] = [r for r in engine.records
+                                   if r.get("record") == "allocation"]
 
     plots.wait_cdf(waits_by_policy, "all pools, logical jobs", out / "wait_cdf_all.png")
     plots.gpu_hours_bars(util_by_policy, gpu_pools, out / "gpu_hours.png")
+    if "fcfs_pending" in allocs_by_policy and "planning_cycle" in allocs_by_policy:
+        plots.user_hold_timeline(
+            {"fcfs_pending": allocs_by_policy["fcfs_pending"],
+             "planning_cycle": allocs_by_policy["planning_cycle"]},
+            gpu_pools, config["horizon_days"], out / "heavy_holders.png")
     sat_windows = [(win0 - 168.0, win1 - 168.0), (win0, win1)]
     plots.occupancy_timeline(snapshots_by_policy, ["h100nvl", "h100sxm", "l40s"],
                              out / "occupancy.png", shade_windows_h=sat_windows)

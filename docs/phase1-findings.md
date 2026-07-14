@@ -66,6 +66,14 @@ event log.
   pool and policy.
 - `phase1/occupancy.png`: GPU occupancy and Pending backlog over the two
   weeks (Saturday validation window shaded).
+- `phase1/heavy_holders.png`: GPUs held over time by the six heaviest idle
+  holders (ranked by held-minus-used GPU-hours under the current policy),
+  current policy vs planning cycle. Under FCFS-Pending the top hoarders
+  keep 4 to 11 GPUs continuously for multiple days (h04: 1826 held GPU-h in
+  two weeks); under declared requests with fixed decision points, quotas
+  and the 24 h multi-GPU cap the same users drop to 264 to 649 held GPU-h,
+  a factor 2 to 4.5 less, and their holds turn over at epoch boundaries
+  instead of persisting.
 
 ## What this does not yet cover
 
