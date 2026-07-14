@@ -98,6 +98,52 @@ point, all policies on the identical trace at each point):
   rises with load (FCFS: 6.5% at 41 users, 44% at 123), so high-load p95
   values are censored from above; sweep.json carries the fractions.
 
+## Sizing the 1-GPU session pool vs the multi-GPU pool
+
+Two sweeps under the recommended policy (principles plus reclaim) answer
+how much capacity to dedicate to 1-GPU sessions and how much can remain
+for time-capped multi-GPU allocations, as the user base grows.
+
+Reserved full-GPU headroom (`phase1/reserve_sizing.png`,
+`phase1/sweep_reserve.md`; reserve swept 0 to 46 of the 116 NVL+L40S GPUs
+at each user count):
+
+- The reserve should stay small at every tested user count. Up to 62 users
+  even reserve zero meets the 15 min P1 target, because reclaim alone
+  keeps enough capacity turning over. Beyond that, the optimum is 0 to 12
+  GPUs, and larger reserves make the 1-GPU tier WORSE, not better: at 123
+  users the tier's p95 rises from 53 min at a 5-GPU reserve to 93 min at
+  46 GPUs. Two mechanisms: reserved GPUs idle whenever no guaranteed-tier
+  request wants them, and a member's second concurrent session (outside
+  the per-member guarantee) is pushed out together with the multi-GPU
+  jobs.
+- Multi-GPU jobs pay monotonically for every reserved GPU (p95 645 to 901
+  min at 123 users going from 0 to 46 reserved), so oversizing the
+  reserve is a pure loss. The maximum multi-GPU pool is therefore
+  essentially everything: all of H100 SXM plus NVL and L40S minus at most
+  a dozen GPUs.
+
+MIG carve for interactive sessions (`phase1/mig_sizing.png`; 1 to 3
+separate NVL nodes carved, 8 full GPUs lost per node): slice capacity is
+not what binds; node-level cordon exposure is. Tracing cancelled sessions
+showed they pend inside maintenance windows of the carved node (one 59 h
+cordon zeroed the whole interactive pool while, outside cordons, even the
+smallest carve had free slices at every tested load). Redundancy fixes it:
+going from one to two carved nodes drops MIG sessions that never start
+from 9 to 33% down to 1.2 to 5.7% at every user count, and a third node
+adds little (0 to 1.3%). The multi-GPU price of the second node is within
+seed noise (p95 shifts of order plus or minus 30 to 60 min on a 430 to
+690 min baseline).
+
+Sizing recommendation, combining the sweeps: dedicate two MIG-carved
+nodes (2 x 26 slices, on separate machines) to 1-GPU sessions plus at
+most a 5 to 12 GPU reserve on the full-GPU pools, and leave everything
+else, about 100 NVL plus L40S GPUs and all 24 SXM GPUs, as the maximum
+pool for time-capped multi-GPU allocations. That configuration holds the
+P1 tier at or near its target across the whole 41 to 123 user range;
+growing the user base further calls for re-running the two sweeps, not
+for larger reserves.
+
 ## What this does not yet cover
 
 Cordon-fraction sensitivity sweep, the gaming externality sweep (K-way

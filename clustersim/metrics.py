@@ -75,11 +75,14 @@ def compute(records: list[dict], snapshots: list[dict],
 
     waits_all: list[float] = []
     waits_interactive: list[float] = []  # P1 tier: single-GPU logical jobs
+    waits_multi: list[float] = []        # multi-GPU (production-size) jobs
     waits_by_pool: dict[str, list[float]] = {}
     waits_by_user: dict[str, list[float]] = {}
-    n_started = n_never = n_inter_never = 0
+    n_started = n_never = n_inter_never = n_multi_never = 0
     for gid, recs in groups.items():
-        interactive = recs[0]["gpus"] == 1 and recs[0]["pool"] in gpu_pools
+        gpu_job = recs[0]["pool"] in gpu_pools
+        interactive = recs[0]["gpus"] == 1 and gpu_job
+        multi = recs[0]["gpus"] > 1 and gpu_job
         started = [r for r in recs if r["outcome"] == "started"]
         if started:
             first = min(started, key=lambda r: r["submit_time"] + r["wait_s"])
@@ -87,12 +90,16 @@ def compute(records: list[dict], snapshots: list[dict],
             waits_all.append(first["wait_s"])
             if interactive:
                 waits_interactive.append(first["wait_s"])
+            if multi:
+                waits_multi.append(first["wait_s"])
             waits_by_pool.setdefault(first["pool"], []).append(first["wait_s"])
             waits_by_user.setdefault(first["user"], []).append(first["wait_s"])
         else:
             n_never += 1
             if interactive:
                 n_inter_never += 1
+            if multi:
+                n_multi_never += 1
 
     resubs = [r for r in req_recs if r["resubmit_of"] is not None
               and t0 <= r["submit_time"] < t1]
@@ -177,6 +184,8 @@ def compute(records: list[dict], snapshots: list[dict],
         "wait_overall": _percentiles(waits_all),
         "wait_interactive": _percentiles(waits_interactive),
         "interactive_never_started": n_inter_never,
+        "wait_multi": _percentiles(waits_multi),
+        "multi_never_started": n_multi_never,
         "wait_by_pool": {p: _percentiles(w) for p, w in sorted(waits_by_pool.items())},
         "utilization_by_pool": util,
         "wp_shares": wp_shares,

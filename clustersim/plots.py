@@ -219,6 +219,105 @@ def wait_vs_users(results: dict[str, dict[float, list[dict]]],
     plt.close(fig)
 
 
+# ordinal sequential ramp (blue, light to dark) for ordered series like
+# increasing user counts; lightest step still clears the surface (>= 2:1)
+SEQ_RAMP = ("#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#0d366b")
+
+
+def reserve_sizing(results: dict[float, dict[float, list[dict]]],
+                   users_at_scale: dict[float, int],
+                   total_reserve: dict[float, int],
+                   target_min: float, out_png):
+    """Two panels sharing x = GPUs reserved for the 1-GPU tier: p95 wait of
+    the 1-GPU tier (top, with the P1 target line) and of multi-GPU jobs
+    (bottom). One line per user count, sequential ramp light to dark."""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 6.5), sharex=True,
+                                   facecolor=SURFACE)
+    for ax in (ax1, ax2):
+        _style_axes(ax)
+    scales = sorted(results)
+    fractions = sorted(next(iter(results.values())))
+    xs = [total_reserve[f] for f in fractions]
+    ramp = {s: c for s, c in zip(scales, SEQ_RAMP)}
+    for key, ax in (("inter_p95_min", ax1), ("multi_p95_min", ax2)):
+        for s in scales:
+            mean, lo, hi = [], [], []
+            for f in fractions:
+                vals = [r[key] for r in results[s][f] if r[key] is not None]
+                if not vals:
+                    mean.append(np.nan), lo.append(np.nan), hi.append(np.nan)
+                    continue
+                mean.append(float(np.mean(vals)))
+                lo.append(min(vals))
+                hi.append(max(vals))
+            ax.plot(xs, mean, color=ramp[s], linewidth=2.0, marker="o",
+                    markersize=4.5, label=f"{users_at_scale[s]} users")
+            ax.fill_between(xs, lo, hi, color=ramp[s], alpha=0.12, linewidth=0)
+        ax.set_ylim(bottom=0)
+    ax1.axhline(target_min, color=INK, linewidth=1.0, linestyle="--", alpha=0.6)
+    ax1.annotate(f"P1 target {target_min:.0f} min", xy=(1.0, target_min),
+                 xycoords=("axes fraction", "data"), xytext=(-4, 4),
+                 textcoords="offset points", ha="right", fontsize=8.5, color=INK)
+    ax1.set_ylabel("p95 wait, 1-GPU tier (min)", color=INK, fontsize=10)
+    ax2.set_ylabel("p95 wait, multi-GPU jobs (min)", color=INK, fontsize=10)
+    ax2.set_xlabel("GPUs reserved for 1-GPU sessions (H100 NVL + L40S)",
+                   color=INK, fontsize=10)
+    ax1.set_title("Sizing the 1-GPU session reserve vs user count "
+                  "(policy: principles + reclaim; band: min to max over seeds)",
+                  color=INK, fontsize=11, loc="left")
+    ax1.legend(frameon=False, fontsize=9, labelcolor=INK, ncol=2)
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def mig_sizing(results: dict[float, dict[int, list[dict]]],
+               users_at_scale: dict[float, int], out_png):
+    """Three panels vs carved NVL nodes: MIG session p95 wait, MIG session
+    never-started fraction, multi-GPU p95 wait. Lines = user counts."""
+    fig, axes = plt.subplots(3, 1, figsize=(9, 8.5), sharex=True,
+                             facecolor=SURFACE)
+    for ax in axes:
+        _style_axes(ax)
+    scales = sorted(results)
+    carves = sorted(next(iter(results.values())))
+    ramp = {s: c for s, c in zip(scales, SEQ_RAMP)}
+    panels = (
+        (axes[0], lambda r: r["mig"]["p95_min"], "p95 wait, MIG sessions (min)"),
+        (axes[1], lambda r: 100 * r["mig"]["never_frac"],
+         "MIG sessions never started (%)"),
+        (axes[2], lambda r: r["multi"]["p95_min"], "p95 wait, multi-GPU jobs (min)"),
+    )
+    for ax, get, ylabel in panels:
+        for s in scales:
+            mean, lo, hi = [], [], []
+            for c in carves:
+                vals = [get(r) for r in results[s][c] if get(r) is not None]
+                if not vals:
+                    mean.append(np.nan), lo.append(np.nan), hi.append(np.nan)
+                    continue
+                mean.append(float(np.mean(vals)))
+                lo.append(min(vals))
+                hi.append(max(vals))
+            ax.plot(carves, mean, color=ramp[s], linewidth=2.0, marker="o",
+                    markersize=4.5, label=f"{users_at_scale[s]} users")
+            ax.fill_between(carves, lo, hi, color=ramp[s], alpha=0.12,
+                            linewidth=0)
+        ax.set_ylim(bottom=0)
+        ax.set_ylabel(ylabel, color=INK, fontsize=10)
+    axes[2].set_xticks(carves)
+    axes[2].set_xlabel("separate H100 NVL nodes carved into MIG "
+                       "(each: 12x 3g + 14x 1g slices, minus 8 full GPUs)",
+                       color=INK, fontsize=10)
+    axes[0].set_title("Sizing the MIG carve for 1-GPU sessions vs user count "
+                      "(policy: principles + reclaim; band: min to max over seeds)",
+                      color=INK, fontsize=11, loc="left")
+    axes[0].legend(frameon=False, fontsize=9, labelcolor=INK, ncol=2)
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def occupancy_timeline(snapshots_by_policy: dict[str, list[dict]],
                        gpu_pools: list[str], out_png,
                        shade_windows_h: list[tuple[float, float]] | None = None):

@@ -124,6 +124,8 @@ class Engine:
             self._record(req, outcome="cancelled_patience", wait_s=req.patience_s)
 
     def _cordon(self, node_id: str, cordoned: bool) -> None:
+        if node_id not in self.cluster.nodes:
+            return  # trace generated for a larger topology variant
         self.cluster.set_cordon(node_id, cordoned)
         if not cordoned:
             self._try_schedule()
