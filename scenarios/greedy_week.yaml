@@ -1,0 +1,82 @@
+# The composite scenario from the PMC discussion: members of all four WPs
+# requesting their GPU, one greedy user grabbing 8 GPUs and trying to keep
+# them for the whole week (poking them for an hour each morning), and
+# trainers running few-hour jobs. Small 2-node H100 NVL cluster (16 GPUs)
+# so the contention is visible request by request.
+name: greedy-week
+description: >
+  One greedy 8-GPU week-long hold vs daily few-hour trainings and 1-GPU
+  member sessions from all four working packages, on 16 NVL GPUs.
+horizon_days: 7
+snapshot_interval_s: 1800
+
+cluster:
+  pools:
+    h100nvl: {num_nodes: 2, gpus_per_node: 8, vcpu_per_node: 184, mem_per_node: 1440, granularity: partial}
+
+policies:
+  fcfs_pending: {}
+  ngt_principles_reclaim:
+    reserve: {h100nvl: 2}
+    multi_gpu_cap_h: 24
+
+requests:
+  # the greedy user: 8 GPUs Monday morning, held all week, active only
+  # one hour per day
+  - user: greta
+    wp: WP2
+    pool: h100nvl
+    gpus: 8
+    time: Mon 09:00
+    hold_h: 168
+    profile: {pattern: [[1, 0.7], [23, 0.02]], repeat: 7}
+    patience_h: 60
+
+  # daily few-hour trainings from the other WPs
+  - user: tom
+    wp: WP1
+    pool: h100nvl
+    gpus: 4
+    time: [Mon 09:30, Tue 09:30, Wed 09:30, Thu 09:30, Fri 09:30]
+    hold_h: 6
+    profile: [[0.5, 0.02], [5, 0.85], [0.5, 0.02]]
+  - user: ada
+    wp: WP3
+    pool: h100nvl
+    gpus: 4
+    time: [Mon 14:00, Wed 14:00, Fri 14:00]
+    hold_h: 4
+    profile: [[0.25, 0.02], [3.5, 0.9], [0.25, 0.02]]
+  - user: lea
+    wp: WP4
+    pool: h100nvl
+    gpus: 2
+    time: [Tue 10:00, Thu 10:00]
+    hold_h: 8
+    profile: [[0.5, 0.02], [7, 0.8], [0.5, 0.02]]
+
+  # 1-GPU member sessions, one per WP, every workday morning
+  - user: sam
+    wp: WP1
+    pool: h100nvl
+    gpus: 1
+    time: [Mon 09:00, Tue 09:00, Wed 09:00, Thu 09:00, Fri 09:00]
+    hold_h: 8
+    profile: [[0.5, 0.4], [1, 0.02], [0.5, 0.4], [1.5, 0.02], [0.5, 0.35], [4, 0.02]]
+    patience_h: 4
+  - user: mia
+    wp: WP2
+    pool: h100nvl
+    gpus: 1
+    time: [Mon 09:15, Tue 09:15, Wed 09:15, Thu 09:15, Fri 09:15]
+    hold_h: 8
+    profile: [[0.5, 0.4], [1, 0.02], [0.5, 0.4], [1.5, 0.02], [0.5, 0.35], [4, 0.02]]
+    patience_h: 4
+  - user: leo
+    wp: WP3
+    pool: h100nvl
+    gpus: 1
+    time: [Mon 09:45, Tue 09:45, Wed 09:45, Thu 09:45, Fri 09:45]
+    hold_h: 8
+    profile: [[0.5, 0.4], [1, 0.02], [0.5, 0.4], [1.5, 0.02], [0.5, 0.35], [4, 0.02]]
+    patience_h: 4

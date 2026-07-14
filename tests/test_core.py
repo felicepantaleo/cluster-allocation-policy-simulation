@@ -258,3 +258,23 @@ def test_planning_cycle_short_tier():
               horizon=72 * H)
     o = outcomes(eng)
     assert o["short"]["wait_s"] == pytest.approx(7 * H + 1.0, abs=2.0)
+
+
+def test_scenario_parsing():
+    from clustersim.scenario import parse_time, build_requests
+    assert parse_time("Mon 00:00") == 0.0
+    assert parse_time("Tue 09:30") == 86400 + 9.5 * H
+    scn = {"requests": [
+        {"user": "g", "wp": "WP2", "pool": "h100nvl", "gpus": 8,
+         "time": ["Mon 09:00", "Tue 09:00"], "hold_h": 24,
+         "profile": {"pattern": [[1, 0.7], [23, 0.02]], "repeat": 1}},
+        {"user": "t", "wp": "WP1", "pool": "h100nvl", "gpus": 1,
+         "time": "Mon 10:00", "hold_h": 4, "kind": "dev"},
+    ]}
+    reqs = build_requests(scn, seed=1)
+    assert len(reqs) == 3
+    g0 = reqs[0]
+    assert g0.submit_time == 9 * H and g0.duration_s == 24 * H
+    assert sum(d for d, _ in g0.profile) == pytest.approx(24 * H)
+    assert reqs[2].wp == "WP1"
+    assert sum(d for d, _ in reqs[2].profile) == pytest.approx(4 * H, rel=1e-6)

@@ -1,0 +1,66 @@
+# Everyone wants their guaranteed GPU at 9:00. Twelve members (three per
+# WP) open interactive sessions every workday morning, on MIG slices and
+# full NVL GPUs, while two 12-hour trainings squeeze the NVL node. Probes
+# principle P1 directly: who actually gets a GPU with little waiting.
+name: session-rush
+description: >
+  Twelve members across the four WPs opening 1-GPU morning sessions
+  against two 12 h trainings, on 8 NVL GPUs plus 12 MIG slices.
+horizon_days: 7
+snapshot_interval_s: 1800
+
+cluster:
+  pools:
+    h100nvl: {num_nodes: 1, gpus_per_node: 8, vcpu_per_node: 184, mem_per_node: 1440, granularity: partial}
+    mig3g:   {num_nodes: 1, gpus_per_node: 12, vcpu_per_node: 138, mem_per_node: 1080, granularity: partial}
+
+policies:
+  fcfs_pending: {}
+  ngt_principles_reclaim:
+    reserve: {h100nvl: 2}
+    multi_gpu_cap_h: 24
+
+requests:
+  # two trainings that occupy the full NVL node from 08:00
+  - user: tara
+    wp: WP1
+    pool: h100nvl
+    gpus: 4
+    time: [Mon 08:00, Wed 08:00, Fri 08:00]
+    hold_h: 12
+    profile: [[0.5, 0.02], [11, 0.85], [0.5, 0.02]]
+  - user: theo
+    wp: WP2
+    pool: h100nvl
+    gpus: 4
+    time: [Mon 08:05, Wed 08:05, Fri 08:05]
+    hold_h: 12
+    profile: [[0.5, 0.02], [11, 0.85], [0.5, 0.02]]
+
+  # four members insist on full-GPU sessions on NVL
+  - {user: n1, wp: WP1, pool: h100nvl, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:00, Tue 09:00, Wed 09:00, Thu 09:00, Fri 09:00]}
+  - {user: n2, wp: WP2, pool: h100nvl, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:10, Tue 09:10, Wed 09:10, Thu 09:10, Fri 09:10]}
+  - {user: n3, wp: WP3, pool: h100nvl, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:20, Tue 09:20, Wed 09:20, Thu 09:20, Fri 09:20]}
+  - {user: n4, wp: WP4, pool: h100nvl, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:30, Tue 09:30, Wed 09:30, Thu 09:30, Fri 09:30]}
+
+  # eight members on MIG slices
+  - {user: m1, wp: WP1, pool: mig3g, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 08:55, Tue 08:55, Wed 08:55, Thu 08:55, Fri 08:55]}
+  - {user: m2, wp: WP1, pool: mig3g, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:05, Tue 09:05, Wed 09:05, Thu 09:05, Fri 09:05]}
+  - {user: m3, wp: WP2, pool: mig3g, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:15, Tue 09:15, Wed 09:15, Thu 09:15, Fri 09:15]}
+  - {user: m4, wp: WP2, pool: mig3g, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:25, Tue 09:25, Wed 09:25, Thu 09:25, Fri 09:25]}
+  - {user: m5, wp: WP3, pool: mig3g, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:35, Tue 09:35, Wed 09:35, Thu 09:35, Fri 09:35]}
+  - {user: m6, wp: WP3, pool: mig3g, gpus: 1, hold_h: 8, kind: dev, patience_h: 3,
+     time: [Mon 09:45, Tue 09:45, Wed 09:45, Thu 09:45, Fri 09:45]}
+  - {user: m7, wp: WP4, pool: mig3g, gpus: 1, hold_h: 9, kind: dev, patience_h: 3,
+     time: [Mon 09:55, Tue 09:55, Wed 09:55, Thu 09:55, Fri 09:55]}
+  - {user: m8, wp: WP4, pool: mig3g, gpus: 1, hold_h: 9, kind: dev, patience_h: 3,
+     time: [Mon 10:05, Tue 10:05, Wed 10:05, Thu 10:05, Fri 10:05]}

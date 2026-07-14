@@ -1,0 +1,68 @@
+# Few-hour multi-GPU trainings arriving in bursts from all four WPs on 24
+# NVL GPUs. WP1 and WP2 dominate the Monday burst; by midweek the
+# fair-share order should favor WP3 and WP4. The planning-cycle variant
+# shows the same jobs shifted to the tier decision epochs (04:00, 12:00,
+# 20:00 for jobs up to 8 h).
+name: training-bursts
+description: >
+  Overlapping bursts of 2 to 8 GPU trainings (2 to 8 h) from all WPs on 24
+  NVL GPUs, under FCFS, WP fair share, and the planning cycle.
+horizon_days: 7
+snapshot_interval_s: 1800
+
+cluster:
+  pools:
+    h100nvl: {num_nodes: 3, gpus_per_node: 8, vcpu_per_node: 184, mem_per_node: 1440, granularity: partial}
+
+policies:
+  fcfs_pending: {}
+  ngt_principles:
+    reserve: {h100nvl: 2}
+    multi_gpu_cap_h: 24
+  planning_cycle:
+    reserve: {h100nvl: 2}
+    multi_gpu_cap_h: 24
+    tiers:
+      - {max_h: 8, decisions_per_day: 3}
+      - {max_h: 100000, decisions_per_day: 1}
+
+requests:
+  # Monday morning burst, WP1/WP2 heavy
+  - {user: a1, wp: WP1, pool: h100nvl, gpus: 8, hold_h: 6, time: Mon 09:00,
+     profile: [[0.25, 0.02], [5.5, 0.9], [0.25, 0.02]]}
+  - {user: a2, wp: WP1, pool: h100nvl, gpus: 4, hold_h: 4, time: Mon 09:05,
+     profile: [[0.25, 0.02], [3.5, 0.9], [0.25, 0.02]]}
+  - {user: a3, wp: WP1, pool: h100nvl, gpus: 4, hold_h: 5, time: Mon 09:10,
+     profile: [[0.25, 0.02], [4.5, 0.9], [0.25, 0.02]]}
+  - {user: b1, wp: WP2, pool: h100nvl, gpus: 8, hold_h: 6, time: Mon 09:15,
+     profile: [[0.25, 0.02], [5.5, 0.9], [0.25, 0.02]]}
+  - {user: b2, wp: WP2, pool: h100nvl, gpus: 4, hold_h: 3, time: Mon 09:20,
+     profile: [[0.25, 0.02], [2.5, 0.9], [0.25, 0.02]]}
+  - {user: c1, wp: WP3, pool: h100nvl, gpus: 4, hold_h: 6, time: Mon 09:25,
+     profile: [[0.25, 0.02], [5.5, 0.9], [0.25, 0.02]]}
+  - {user: d1, wp: WP4, pool: h100nvl, gpus: 2, hold_h: 4, time: Mon 09:30,
+     profile: [[0.25, 0.02], [3.5, 0.9], [0.25, 0.02]]}
+
+  # repeated daily trainings through the week
+  - {user: a1, wp: WP1, pool: h100nvl, gpus: 4, hold_h: 4,
+     time: [Tue 10:00, Wed 10:00, Thu 10:00],
+     profile: [[0.25, 0.02], [3.5, 0.9], [0.25, 0.02]]}
+  - {user: b1, wp: WP2, pool: h100nvl, gpus: 4, hold_h: 4,
+     time: [Tue 10:30, Wed 10:30, Thu 10:30],
+     profile: [[0.25, 0.02], [3.5, 0.9], [0.25, 0.02]]}
+
+  # Wednesday afternoon burst, WP3/WP4 catch up
+  - {user: c1, wp: WP3, pool: h100nvl, gpus: 8, hold_h: 5, time: Wed 14:00,
+     profile: [[0.25, 0.02], [4.5, 0.9], [0.25, 0.02]]}
+  - {user: c2, wp: WP3, pool: h100nvl, gpus: 4, hold_h: 6, time: Wed 14:05,
+     profile: [[0.25, 0.02], [5.5, 0.9], [0.25, 0.02]]}
+  - {user: d1, wp: WP4, pool: h100nvl, gpus: 4, hold_h: 3, time: Wed 14:10,
+     profile: [[0.25, 0.02], [2.5, 0.9], [0.25, 0.02]]}
+  - {user: a2, wp: WP1, pool: h100nvl, gpus: 8, hold_h: 4, time: Wed 14:15,
+     profile: [[0.25, 0.02], [3.5, 0.9], [0.25, 0.02]]}
+
+  # Friday: WP4 gets its large job of the week
+  - {user: d2, wp: WP4, pool: h100nvl, gpus: 8, hold_h: 8, time: Fri 09:00,
+     profile: [[0.25, 0.02], [7.5, 0.9], [0.25, 0.02]]}
+  - {user: b2, wp: WP2, pool: h100nvl, gpus: 8, hold_h: 6, time: Fri 09:10,
+     profile: [[0.25, 0.02], [5.5, 0.9], [0.25, 0.02]]}

@@ -318,6 +318,102 @@ def mig_sizing(results: dict[float, dict[int, list[dict]]],
     plt.close(fig)
 
 
+# fixed WP colors: categorical slots 1 to 4 in order
+WP_COLORS = {"WP1": BLUE, "WP2": AQUA, "WP3": YELLOW, "WP4": GREEN}
+DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def scenario_timeline(scenario_name: str, policy_name: str,
+                      records: list[dict], snapshots: list[dict],
+                      gpu_pools: list[str], horizon_days: float, out_png):
+    """Per-user week timeline for a scripted scenario. Each row is a user:
+    outlined light bars are Pending spans, solid bars are held allocations
+    (bar height scales with GPU count, labeled), an ink x marks a reclaim
+    or time-cap termination, an open circle a patience cancellation.
+    Colors follow the working package. Bottom strip: total allocated GPUs
+    vs capacity at the snapshot granularity."""
+    req_recs = [r for r in records if r.get("record") != "allocation"]
+    alloc_recs = [r for r in records if r.get("record") == "allocation"]
+    users = sorted({(r["wp"], r["user"]) for r in req_recs})
+    rows = {u: i for i, u in enumerate(users)}
+    max_g = max((a["held_gpus"] for a in alloc_recs), default=1)
+
+    fig, (ax, ax2) = plt.subplots(
+        2, 1, figsize=(11, 0.62 * len(users) + 3.2), sharex=True,
+        facecolor=SURFACE,
+        gridspec_kw={"height_ratios": [max(len(users), 3), 4]})
+    for a in (ax, ax2):
+        _style_axes(a)
+
+    def d(t):
+        return t / 86400.0
+
+    for r in req_recs:
+        y = rows[(r["wp"], r["user"])]
+        c = WP_COLORS.get(r["wp"], MUTED)
+        p0, p1 = d(r["submit_time"]), d(r["submit_time"] + r["wait_s"])
+        if r["outcome"] in ("started", "cancelled_patience", "pending_at_end") \
+                and p1 > p0:
+            ax.fill_between([p0, p1], y - 0.08, y + 0.08, color=c, alpha=0.25,
+                            linewidth=0)
+        if r["outcome"] == "cancelled_patience":
+            ax.plot(p1, y, marker="o", mfc="none", mec=INK, markersize=6,
+                    mew=1.2, linestyle="none")
+    for a in alloc_recs:
+        y = rows[(a["wp"], a["user"])]
+        c = WP_COLORS.get(a["wp"], MUTED)
+        h = 0.12 + 0.30 * a["held_gpus"] / max_g
+        ax.fill_between([d(a["start"]), d(a["end"])], y - h, y + h, color=c,
+                        alpha=0.85, linewidth=0.5, edgecolor=SURFACE)
+        if d(a["end"]) - d(a["start"]) > 0.08 and a["held_gpus"] > 1:
+            ax.annotate(str(a["held_gpus"]),
+                        xy=((d(a["start"]) + d(a["end"])) / 2, y),
+                        ha="center", va="center", fontsize=7.5, color=SURFACE,
+                        fontweight="bold")
+        if a["end_reason"] in ("reclaimed", "time_capped"):
+            ax.plot(d(a["end"]), y, marker="x", color=INK, markersize=6,
+                    mew=1.4, linestyle="none")
+
+    ax.set_yticks([rows[u] for u in users],
+                  [f"{user} ({wp})" for wp, user in users], fontsize=9)
+    ax.set_ylim(-0.7, len(users) - 0.3)
+    ax.invert_yaxis()
+    ax.set_title(f"{scenario_name}: {policy_name}", color=INK, fontsize=11,
+                 loc="left", pad=30)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, alpha=0.85, label=wp)
+               for wp, c in WP_COLORS.items()]
+    handles += [
+        plt.Rectangle((0, 0), 1, 1, color=MUTED, alpha=0.25, label="pending"),
+        plt.Line2D([], [], marker="x", color=INK, linestyle="none",
+                   label="reclaimed / capped"),
+        plt.Line2D([], [], marker="o", mfc="none", mec=INK, linestyle="none",
+                   label="gave up (patience)"),
+    ]
+    ax.legend(handles=handles, frameon=False, fontsize=8, labelcolor=INK,
+              ncol=7, loc="lower left", bbox_to_anchor=(0, 1.0))
+
+    t = np.array([s["time"] for s in snapshots]) / 86400.0
+    cap = np.array([sum(s[f"{p}.capacity_gpus"] for p in gpu_pools)
+                    for s in snapshots])
+    alloc = np.array([sum(s[f"{p}.allocated_gpus"] for p in gpu_pools)
+                      for s in snapshots])
+    ax2.step(t, alloc, where="post", color=INK, linewidth=1.4,
+             label="allocated GPUs")
+    ax2.plot(t, cap, color=MUTED, linewidth=1.0, linestyle=":",
+             label="capacity")
+    ax2.set_ylabel("GPUs", color=INK, fontsize=10)
+    ax2.set_ylim(0, cap.max() * 1.15)
+    ax2.legend(frameon=False, fontsize=8, labelcolor=INK, ncol=2)
+    ax2.set_xticks(range(int(horizon_days) + 1))
+    ax2.set_xticklabels([DAY_NAMES[i % 7] for i in range(int(horizon_days))]
+                        + [DAY_NAMES[int(horizon_days) % 7]], fontsize=9)
+    ax2.set_xlim(0, horizon_days)
+    ax2.set_xlabel("day (30-minute snapshot granularity)", color=INK, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def occupancy_timeline(snapshots_by_policy: dict[str, list[dict]],
                        gpu_pools: list[str], out_png,
                        shade_windows_h: list[tuple[float, float]] | None = None):

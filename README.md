@@ -74,6 +74,27 @@ runs every policy in the config on it, and writes per-policy records,
 metrics, validation checks, plots and `comparison.md`. Same config, same
 output, byte for byte.
 
+Sweeps: `python -m clustersim.sweep` (waiting time vs number of users),
+`python -m clustersim.sweep_reserve` (1-GPU tier reserve sizing),
+`python -m clustersim.sweep_mig` (MIG carve sizing).
+
+## Scenario mode
+
+    .venv/bin/python -m clustersim.scenario --scenario scenarios/greedy_week.yaml \
+        --config config/phase1.yaml --out results/scenarios/greedy_week
+
+A scenario YAML scripts a week of requests explicitly (user, WP, pool,
+GPUs, submit time as "Tue 09:30", hold, utilization profile), optionally
+with its own small topology, and runs it under selected policies at
+30-minute reporting granularity. Output: one per-user timeline per policy
+(pending, held with GPU count, reclaim/cap and give-up markers, colored by
+WP) plus an occupancy strip and a summary table. Shipped scenarios:
+`scenarios/greedy_week.yaml` (one 8-GPU week-long hoard vs trainings and
+member sessions), `scenarios/session_rush.yaml` (twelve members opening
+9:00 sessions against two trainings), `scenarios/training_bursts.yaml`
+(bursts of few-hour multi-GPU trainings under FCFS, fair share, and the
+planning cycle). The schema is documented in `clustersim/scenario.py`.
+
 ## Assumptions vs ground truth
 
 The config tags each block: G = ground truth from the PMC kickoff (pool
