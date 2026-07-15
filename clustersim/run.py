@@ -20,6 +20,7 @@ from .cluster import Cluster, PoolSpec
 from .engine import Engine
 from .metrics import compute, idle_held_h100_probe, saturday_window_check
 from .policies import make_policy
+from . import principles
 from .trace import read_trace, write_trace
 from . import tracegen, plots
 
@@ -123,6 +124,7 @@ def main() -> None:
     t1 = config["horizon_days"] * 24 * H
     win0, win1 = config["validation"]["saturday_window_h"]
 
+    cards: dict[str, dict] = {}
     metrics_by_policy: dict[str, dict] = {}
     waits_by_policy: dict[str, list[float]] = {}
     snapshots_by_policy: dict[str, list[dict]] = {}
@@ -172,6 +174,17 @@ def main() -> None:
         util_by_policy[pname] = m["utilization_by_pool"]
         allocs_by_policy[pname] = [r for r in engine.records
                                    if r.get("record") == "allocation"]
+        card = principles.scorecard(
+            engine.records, engine.requests_by_id, gpu_pools, t0, t1,
+            wp_targets=config.get("wp_targets"),
+            charge_factors=config.get("gpu_charge_factor"),
+            cap_h=pparams.get("multi_gpu_cap_h", 24.0) if pparams else 24.0,
+            planning_tiers=(pparams or {}).get(
+                "tiers", [{"max_h": 8, "decisions_per_day": 3},
+                          {"max_h": 100000, "decisions_per_day": 1}])
+            if pname == "planning_cycle" else None)
+        cards[pname] = card
+        (pdir / "principles.json").write_text(json.dumps(card, indent=2))
 
     plots.wait_cdf(waits_by_policy, "all pools, logical jobs", out / "wait_cdf_all.png")
     plots.gpu_hours_bars(util_by_policy, gpu_pools, out / "gpu_hours.png")
@@ -188,7 +201,9 @@ def main() -> None:
     report = ["# Phase 1 comparison: " + " vs ".join(metrics_by_policy), "",
               f"Trace seed {config['seed']}, engine seed {config['engine']['seed']}, "
               f"measurement window days {config['warmup_days']} to {config['horizon_days']}.",
-              "", "## Metrics", "", table, "", "## Validation vs observed Saturday data point", ""]
+              "", "## Metrics", "", table, "",
+              principles.render_md(cards), "",
+              "## Validation vs observed Saturday data point", ""]
     for pname, v in validation.items():
         report += [f"### {pname}", "", "```json", json.dumps(v, indent=2), "```", ""]
     (out / "comparison.md").write_text("\n".join(report))

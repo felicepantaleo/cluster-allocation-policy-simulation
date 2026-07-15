@@ -50,7 +50,7 @@ from .engine import Engine
 from .policies import make_policy
 from .run import build_cluster
 from .trace import CordonEvent, Request
-from . import plots, tracegen
+from . import plots, principles, tracegen
 
 H = 3600.0
 DAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -158,6 +158,7 @@ def main() -> None:
     cordons = build_cordons(scn)
 
     md = [f"# Scenario: {scn['name']}", "", scn.get("description", "").strip(), ""]
+    cards: dict[str, dict] = {}
     for pname, overrides in scn["policies"].items():
         params = dict(config["policies"].get(pname, {}))
         params.update(overrides or {})
@@ -193,7 +194,18 @@ def main() -> None:
                       f"{d['held_gpu_h']:.0f} | {d['active_gpu_h']:.1f} | "
                       f"{d['reclaims']} |")
         md.append("")
+        cards[pname] = principles.scorecard(
+            engine.records, engine.requests_by_id, gpu_pools,
+            0.0, horizon_s,
+            wp_targets=config.get("wp_targets"),
+            charge_factors=config.get("gpu_charge_factor"),
+            cap_h=params.get("multi_gpu_cap_h", 24.0),
+            planning_tiers=params.get(
+                "tiers", [{"max_h": 8, "decisions_per_day": 3},
+                          {"max_h": 100000, "decisions_per_day": 1}])
+            if pname == "planning_cycle" else None)
         print(f"{scn['name']}: {pname} done")
+    md += [principles.render_md(cards), ""]
     (out / "summary.md").write_text("\n".join(md) + "\n")
     print(f"wrote {out}/summary.md and timelines")
 

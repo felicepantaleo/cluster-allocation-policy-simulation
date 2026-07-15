@@ -47,6 +47,40 @@ Trace seed 20260714, engine seed 42, measurement window days 7 to 14.
 | WP4 charged share (target 0.10) | 0.092 | 0.114 | 0.091 | 0.094 | 0.109 |
 | WP share max deviation | 0.041 | 0.052 | 0.028 | 0.015 | 0.012 |
 
+## Principles scorecard
+
+P1 target: 1-GPU dev session served within 15 min. Job-done: at least 90% of requested active GPU-seconds delivered across the reclaim/resubmit chain.
+
+| principle / metric | fcfs_pending | idle_reclaim | ngt_principles | ngt_principles_reclaim | planning_cycle |
+|---|---|---|---|---|---|
+| P1 verdict | missed | partial | missed | partial | missed |
+| P1 dev 1-GPU sessions | 564 | 564 | 564 | 564 | 564 |
+| P1 served within target | 58% | 85% | 64% | 87% | 39% |
+| P1 p95 wait (min) | 167 | 9 | 129 | 6 | 310 |
+| P1 never started | 98 | 64 | 103 | 60 | 184 |
+| P1 mean devs waiting | 4.13 | 2.70 | 3.93 | 2.47 | 6.89 |
+| P1 peak devs waiting | 25 | 19 | 24 | 19 | 28 |
+| P2 verdict | met | partial | met | met | met |
+| P2 max share deviation | 0.041 | 0.052 | 0.028 | 0.015 | 0.012 |
+| P3 verdict | missed | missed | met | met | met |
+| P3 multi-GPU holds over cap | 42 | 38 | 0 | 0 | 0 |
+| P3 excess GPU-h over cap | 2644.8 | 1817.7 | 0 | 0 | 0 |
+| P3 longest multi-GPU hold (h) | 98.9 | 72.0 | 24.0 | 24.0 | 24.0 |
+| P4 verdict | missed | missed | partial | partial | met |
+| P4 same-WP handoff fraction | 28% | 28% | 42% | 38% | 55% |
+| P5 verdict | met | met | met | met | met |
+| P6 verdict | not implemented by this policy | not implemented by this policy | not implemented by this policy | not implemented by this policy | missed |
+| P6 granted at first epoch | n/a | n/a | n/a | n/a | 31% |
+| dev: jobs done | 82% | 88% | 81% | 89% | 66% |
+| dev: median time to done (h) | 4.7 | 2.0 | 4.7 | 1.9 | 5.8 |
+| dev: median held vs asked (started) | 100% | 44% | 100% | 44% | 100% |
+| hoard: jobs done | 83% | 88% | 88% | 88% | 62% |
+| hoard: median time to done (h) | 56.5 | 1.0 | 27.6 | 1.0 | 44.3 |
+| hoard: median held vs asked (started) | 100% | 2% | 70% | 2% | 80% |
+| train: jobs done | 64% | 71% | 65% | 70% | 45% |
+| train: median time to done (h) | 9.1 | 8.5 | 8.7 | 8.1 | 8.3 |
+| train: median held vs asked (started) | 100% | 98% | 100% | 98% | 100% |
+
 ## Validation vs observed Saturday data point
 
 ### fcfs_pending

@@ -98,6 +98,33 @@ point, all policies on the identical trace at each point):
   rises with load (FCFS: 6.5% at 41 users, 44% at 123), so high-load p95
   values are censored from above; sweep.json carries the fractions.
 
+## Principles scorecard
+
+Every policy comparison now carries a principle-by-principle scorecard
+(`phase1/comparison.md`, bottom section; also appended to every scenario
+summary). Verdict criteria are stated in the table header. Highlights
+from the two-week statistical run:
+
+- P1: at calibrated load no policy fully meets a 15 min p95 for 1-GPU dev
+  sessions; principles plus reclaim comes closest (87% served within 15
+  min, p95 6 min, but 60 of 564 sessions still never start). At any
+  instant a mean of 4.1 developers sit waiting for a single GPU under the
+  current policy (peak 25), 2.5 under principles plus reclaim (peak 19).
+- P3: the current policy has 42 multi-GPU holds exceeding 24 h (2645
+  excess GPU-hours per week, longest 99 h); every principles policy has
+  zero by construction.
+- P4: contended handoffs stay within the releasing WP 28% of the time
+  under FCFS (the WP mix, i.e. no recycling), 38 to 42% under the
+  fair-share policies, 55% under the planning cycle.
+- P6: even the planning cycle grants only 31% of declared multi-GPU jobs
+  at their first decision epoch at this load; the backlog rolls the rest.
+- Job-done per class (chains followed across reclaim and caps, "done" =
+  90% of genuinely active GPU-seconds delivered): hoarders complete their
+  actual work in a median of 1.0 h under reclaim while holding 2% of what
+  they asked, vs 56 h and 100% under the current policy; dev sessions
+  finish faster (median 1.9 vs 4.7 h) at 44% of the held hours; trainer
+  completion rises from 64 to 70%.
+
 ## Sizing the 1-GPU session pool vs the multi-GPU pool
 
 Two sweeps under the recommended policy (principles plus reclaim) answer

@@ -191,3 +191,37 @@ One week at realistic scale: the current GPU topology (11 NVL nodes plus the MIG
 | t03 | WP4 | 11 | 6 | 5 | 947 | 112 | 76.5 | 0 |
 | t06 | WP4 | 16 | 6 | 10 | 365 | 136 | 98.0 | 0 |
 
+## Principles scorecard
+
+P1 target: 1-GPU dev session served within 15 min. Job-done: at least 90% of requested active GPU-seconds delivered across the reclaim/resubmit chain.
+
+| principle / metric | fcfs_pending | ngt_principles_reclaim | planning_cycle |
+|---|---|---|---|
+| P1 verdict | met | met | missed |
+| P1 dev 1-GPU sessions | 341 | 341 | 341 |
+| P1 served within target | 92% | 95% | 55% |
+| P1 p95 wait (min) | 10 | 0 | 284 |
+| P1 never started | 10 | 8 | 65 |
+| P1 mean devs waiting | 0.45 | 0.32 | 2.28 |
+| P1 peak devs waiting | 11 | 10 | 12 |
+| P2 verdict | missed | partial | missed |
+| P2 max share deviation | 0.125 | 0.078 | 0.103 |
+| P3 verdict | missed | met | met |
+| P3 multi-GPU holds over cap | 31 | 0 | 0 |
+| P3 excess GPU-h over cap | 2816.8 | 0 | 0 |
+| P3 longest multi-GPU hold (h) | 131.4 | 24.0 | 24.0 |
+| P4 verdict | missed | missed | partial |
+| P4 same-WP handoff fraction | 28% | 26% | 39% |
+| P5 verdict | met | met | met |
+| P6 verdict | not implemented by this policy | not implemented by this policy | missed |
+| P6 granted at first epoch | n/a | n/a | 38% |
+| dev: jobs done | 96% | 96% | 79% |
+| dev: median time to done (h) | 5.0 | 2.0 | 5.8 |
+| dev: median held vs asked (started) | 100% | 44% | 100% |
+| hoard: jobs done | 96% | 96% | 60% |
+| hoard: median time to done (h) | 53.2 | 1.0 | 40.5 |
+| hoard: median held vs asked (started) | 100% | 1% | 82% |
+| train: jobs done | 78% | 82% | 53% |
+| train: median time to done (h) | 8.5 | 7.6 | 8.0 |
+| train: median held vs asked (started) | 100% | 98% | 100% |
+
