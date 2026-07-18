@@ -40,7 +40,7 @@ POOL_COLOR = {"h100nvl": BLUE, "h100sxm": ORANGE, "l40s": PURPLE,
               "amd": VIOLET, "mig3g": GRAY, "mig1g": GRAY}
 WP_COLOR = {"WP1": BLUE, "WP2": ORANGE, "WP3": PURPLE, "WP4": VIOLET,
             "outside roster": GRAY}
-STAMP = "NGT cluster, CERN MONIT data"
+STAMP = "NGT cluster"
 AUTHOR = "Felice Pantaleo (CERN)"
 
 # cloud-equivalent rates: cheapest of AWS/GCP on-demand, July 2026
