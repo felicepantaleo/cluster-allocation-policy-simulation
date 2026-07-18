@@ -91,7 +91,8 @@ def main() -> None:
     raw = [json.loads(l) for l in open(der / "requests.jsonl")]
     wp_map = json.loads((der / "user_wp.json").read_text())
     raw = [r for r in raw if r["gpus"] > 0
-           and r["pool"] not in ("cloud_t4", "cpu", "unknown")]
+           and r["pool"] not in ("cloud_t4", "cpu", "unknown")
+           and wp_map.get(r["user"], {}).get("wp") != "STEAM"]
 
     END = max(r["submit_time"] for r in raw) + 60
     T0 = math.floor(min(r["submit_time"] for r in raw) / 86400) * 86400

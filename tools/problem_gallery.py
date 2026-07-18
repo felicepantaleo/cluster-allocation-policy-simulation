@@ -71,6 +71,12 @@ def main() -> None:
     reqs = [json.loads(l) for l in open(der / "requests.jsonl")]
     cords = [json.loads(l) for l in open(der / "cordons.jsonl")]
     wp_map = json.loads((der / "user_wp.json").read_text())
+    # STEAM ACADEMY participants are out of scope for scheduling statistics
+    n_steam = sum(1 for r in reqs
+                  if wp_map.get(r["user"], {}).get("wp") == "STEAM")
+    reqs = [r for r in reqs
+            if wp_map.get(r["user"], {}).get("wp") != "STEAM"]
+    print(f"excluded {n_steam} STEAM-participant pod instances")
 
     tmax = max(r["submit_time"] for r in reqs)
     END = int(np.ceil(tmax / 86400) * 86400)
