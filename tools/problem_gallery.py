@@ -272,6 +272,8 @@ def main() -> None:
                     xytext=(0, 4), textcoords="offset points", ha="center",
                     fontsize=12)
     ax.set_xticks(xs, order)
+    ax.tick_params(axis="x", which="both", bottom=False, top=False)
+    ax.tick_params(axis="y", which="both", right=False)
     ax.set_ylabel("share of full-GPU hours (%)")
     ax.set_title(f"Who gets the GPU-hours: {100*vals[4]/tot:.0f}% go to "
                  "users outside the WP roster", loc="left")
