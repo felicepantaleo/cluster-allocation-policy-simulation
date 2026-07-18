@@ -41,6 +41,28 @@ POOL_COLOR = {"h100nvl": BLUE, "h100sxm": ORANGE, "l40s": PURPLE,
 WP_COLOR = {"WP1": BLUE, "WP2": ORANGE, "WP3": PURPLE, "WP4": VIOLET,
             "outside roster": GRAY}
 STAMP = "NGT cluster, CERN MONIT data"
+AUTHOR = "Felice Pantaleo (CERN)"
+
+# cloud-equivalent rates: cheapest of AWS/GCP on-demand, July 2026
+USD_GPU_H = {"h100nvl": 6.88, "h100sxm": 6.88,  # AWS p5.48xlarge / 8
+             "l40s": 2.62,                      # AWS g6e.12xlarge / 4
+             "amd": 6.88,                       # H100-class (not on AWS/GCP)
+             "mig3g": 6.88 / 2, "mig1g": 6.88 / 7}
+CHF_USD = 0.862  # exchange rate used in the NGT budget sheet
+RATE_CHF = {p: v * CHF_USD for p, v in USD_GPU_H.items()}
+
+
+def chf_axis(ax, pool, axis="y"):
+    """Secondary axis converting GPU-hours to cloud-equivalent kCHF. A pure
+    unit conversion (one pool, one rate), not a second measure."""
+    r = RATE_CHF[pool] / 1000.0
+    fwd, inv = (lambda v: v * r), (lambda v: v / r)
+    if axis == "y":
+        sec = ax.secondary_yaxis("right", functions=(fwd, inv))
+    else:
+        sec = ax.secondary_xaxis("top", functions=(fwd, inv))
+    sec.tick_params(labelsize=9, colors="#555555")
+    return sec
 
 
 def dt(ts):
@@ -48,7 +70,7 @@ def dt(ts):
 
 
 def stamp(ax, window):
-    ax.text(0.995, 0.015, f"{STAMP}, {window}",
+    ax.text(0.995, 0.015, f"{STAMP}, {window}. {AUTHOR}",
             transform=ax.figure.transFigure, ha="right", va="bottom",
             fontsize=10, color="#555555")
 
@@ -184,27 +206,44 @@ def main() -> None:
     save(fig, out, "02_waits.png")
 
     # ---- 03 pending backlog
-    pend = np.zeros(len(grid))
+    backlog_groups = [
+        ("h100nvl", ("h100nvl",), BLUE), ("h100sxm", ("h100sxm",), ORANGE),
+        ("l40s", ("l40s",), PURPLE), ("amd", ("amd",), VIOLET),
+        ("mig", ("mig3g", "mig1g"), GRAY),
+        ("never placed", ("unplaced", "gpu_unknown"), RED)]
+    pend_g = {name: np.zeros(len(grid)) for name, _, _ in backlog_groups}
     for r in gpu:
+        name = next((n for n, pools_, _ in backlog_groups
+                     if r["pool"] in pools_), None)
+        if name is None:
+            continue
         for a, b in r["observed"]["pending_intervals"]:
             i, j = np.searchsorted(grid, [a, b])
-            pend[i:j] += 1
+            pend_g[name][i:j] += 1
     fig, ax = plt.subplots(figsize=(13, 5.5))
-    ax.fill_between(gdt, pend, step="mid", color=RED, alpha=0.7, linewidth=0)
+    bottom = np.zeros(len(grid))
+    for name, _, c in backlog_groups:
+        ax.fill_between(gdt, bottom, bottom + pend_g[name], step="mid",
+                        color=c, alpha=0.8, linewidth=0, label=name)
+        bottom += pend_g[name]
     ax.set_ylabel("GPU/MIG requests Pending")
-    ax.set_title(f"A queue exists in all but name: up to {int(pend.max())} "
+    ax.set_title(f"A queue exists in all but name: up to {int(bottom.max())} "
                  "allocation requests wait as Pending pods", loc="left")
     stamp(ax, window)
+    ax.legend(fontsize=10, ncol=3)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
     save(fig, out, "03_pending_backlog.png")
 
-    # ---- 04 daily active vs idle held GPU-hours (DCGM-covered)
+    # ---- 04 daily active vs idle held GPU-hours, per pool, with the
+    # cloud-equivalent kCHF conversion on the right axis
     days = np.arange(START, END, 86400.0)
-    active_d = np.zeros(len(days))
-    idle_d = np.zeros(len(days))
+    ddt = [dt(d + 43200) for d in days]
+    dcgm_pools = ("h100nvl", "h100sxm", "l40s")
+    act_p = {p: np.zeros(len(days)) for p in dcgm_pools}
+    idl_p = {p: np.zeros(len(days)) for p in dcgm_pools}
     covered = 0
     for r in started:
-        if not r["profile"] or r["pool"] not in FULLGPU \
+        if not r["profile"] or r["pool"] not in dcgm_pools \
                 or not r["observed"]["running_intervals"]:
             continue
         covered += 1
@@ -213,43 +252,54 @@ def main() -> None:
             i = min(int((t - START) // 86400), len(days) - 1)
             if i >= 0:
                 gh = dur * r["gpus"] / H
-                if u < 0.05:
-                    idle_d[i] += gh
-                else:
-                    active_d[i] += gh
+                (idl_p if u < 0.05 else act_p)[r["pool"]][i] += gh
             t += dur
-    fig, ax = plt.subplots(figsize=(13, 6))
-    ddt = [dt(d + 43200) for d in days]
-    ax.bar(ddt, active_d, width=0.8, color=BLUE, label="active GPU-hours")
-    ax.bar(ddt, idle_d, width=0.8, bottom=active_d, color=RED, alpha=0.85,
-           label="held but idle (GPU util < 5%)")
-    tot_i, tot_a = idle_d.sum(), active_d.sum()
-    ax.set_ylabel("GPU-hours per day")
-    ax.set_title(f"{100*tot_i/(tot_i+tot_a):.0f}% of monitored held GPU-hours "
-                 f"are idle: {tot_i:.0f} GPU-hours parked in 30 days",
-                 loc="left")
-    stamp(ax, window)
-    ax.legend(fontsize=12)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
-    fig.text(0.12, -0.02, f"DCGM utilization available for {covered} "
-             "full-GPU allocations; MIG slices not covered.", fontsize=10,
-             color="#555555")
+    tot_i = sum(v.sum() for v in idl_p.values())
+    tot_a = sum(v.sum() for v in act_p.values())
+    fig, axes = plt.subplots(len(dcgm_pools), 1, figsize=(13, 11),
+                             sharex=True)
+    for ax, p in zip(axes, dcgm_pools):
+        ax.bar(ddt, act_p[p], width=0.8, color=BLUE,
+               label="active" if p == dcgm_pools[0] else None)
+        ax.bar(ddt, idl_p[p], width=0.8, bottom=act_p[p], color=RED,
+               alpha=0.85,
+               label="held but idle (util < 5%)" if p == dcgm_pools[0] else None)
+        ax.set_ylabel(f"{p}\nGPU-h per day")
+        sec = chf_axis(ax, p, "y")
+        sec.set_ylabel("kCHF/day (cloud eq.)", fontsize=10, color="#555555")
+    idle_chf_d = sum(idl_p[p].sum() * RATE_CHF[p] for p in dcgm_pools) / 1000
+    axes[0].set_title(
+        f"{100*tot_i/(tot_i+tot_a):.0f}% of monitored held GPU-hours are "
+        f"idle: {tot_i:.0f} GPU-hours, a {idle_chf_d:.0f} kCHF/month cloud "
+        "equivalent", loc="left")
+    stamp(axes[0], window)
+    axes[0].legend(fontsize=11)
+    axes[-1].xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+    fig.text(0.12, 0.005, f"DCGM utilization available for {covered} "
+             "full-GPU allocations; MIG slices and AMD not covered. "
+             "Cloud rates as in the cost plot.", fontsize=10, color="#555555")
     save(fig, out, "04_idle_gpu_hours.png")
 
     # ---- 05 idle fraction per allocation
-    fr = []
+    fr_p = {p: [] for p in ("h100nvl", "h100sxm", "l40s")}
     for r in started:
-        if r["profile"] and r["pool"] in FULLGPU:
+        if r["profile"] and r["pool"] in fr_p:
             tot = sum(d for d, _ in r["profile"])
-            fr.append(sum(d for d, u in r["profile"] if u < 0.05) / tot)
+            fr_p[r["pool"]].append(
+                sum(d for d, u in r["profile"] if u < 0.05) / tot)
+    all_fr = [f for v in fr_p.values() for f in v]
     fig, ax = plt.subplots(figsize=(11, 6))
-    ax.hist(fr, bins=20, color=RED, alpha=0.85)
+    bins = np.linspace(0, 1, 21)
+    ax.hist([fr_p[p] for p in fr_p], bins=bins, stacked=True,
+            color=[POOL_COLOR[p] for p in fr_p],
+            label=[f"{p} (n={len(fr_p[p])})" for p in fr_p])
     ax.set_xlabel("fraction of allocation lifetime with GPU util < 5%")
     ax.set_ylabel("allocations")
     ax.set_title(f"The median monitored allocation is idle for "
-                 f"{100*np.median(fr):.0f}% of its lifetime (n={len(fr)})",
-                 loc="left")
+                 f"{100*np.median(all_fr):.0f}% of its lifetime "
+                 f"(n={len(all_fr)})", loc="left")
     stamp(ax, window)
+    ax.legend(fontsize=10, loc="upper left")
     save(fig, out, "05_idle_fraction.png")
 
     # ---- 06 WP shares
@@ -282,10 +332,21 @@ def main() -> None:
 
     # ---- 07 unsatisfied requests
     w = np.array([r["observed"]["wait_s"] / 60 for r in cancelled])
+    canc_groups = [("h100nvl", ("h100nvl",), BLUE),
+                   ("h100sxm", ("h100sxm",), ORANGE),
+                   ("l40s", ("l40s",), PURPLE), ("amd", ("amd",), VIOLET),
+                   ("mig", ("mig3g", "mig1g"), GRAY),
+                   ("never placed", ("unplaced", "gpu_unknown"), RED)]
     fig, ax = plt.subplots(figsize=(11, 6))
     bins = np.logspace(0, np.log10(max(w.max(), 10)), 24)
-    ax.hist(np.clip(w, 1, None), bins=bins, color=RED, alpha=0.85)
+    per_pool_w = [np.clip([r["observed"]["wait_s"] / 60 for r in cancelled
+                           if r["pool"] in pools_], 1, None)
+                  for _, pools_, _ in canc_groups]
+    ax.hist(per_pool_w, bins=bins, stacked=True,
+            color=[c for _, _, c in canc_groups],
+            label=[n for n, _, _ in canc_groups])
     ax.set_xscale("log")
+    ax.legend(fontsize=10, loc="upper left")
     ax.set_xlabel("time spent Pending before the request was abandoned (minutes)")
     ax.set_ylabel("abandoned requests")
     ax.set_title(f"{len(w)} allocation requests were never satisfied; "
@@ -309,8 +370,12 @@ def main() -> None:
                      and r["duration_s"] > 24 * H)
     fig, ax = plt.subplots(figsize=(11, 6))
     bins = np.logspace(np.log10(0.1), np.log10(holds.max()), 28)
-    ax.hist(holds, bins=bins, color=BLUE, alpha=0.85)
+    hold_p = [[r["duration_s"] / H for r in started
+               if r["duration_s"] > 0 and r["pool"] == p] for p in FULLGPU]
+    ax.hist(hold_p, bins=bins, stacked=True,
+            color=[POOL_COLOR[p] for p in FULLGPU], label=list(FULLGPU))
     ax.axvline(24, color="black", linestyle="--", linewidth=1.5)
+    ax.legend(fontsize=10, loc="upper left")
     ax.text(24, ax.get_ylim()[1] * 0.75, " proposed 24 h multi-GPU cap",
             rotation=90, va="top", fontsize=11)
     ax.set_xscale("log")
@@ -533,28 +598,26 @@ def main() -> None:
                     ((k, v) for k, v in pu.items() if k[0] == pool))
         top_i = sum(d["idle"] for _, d in rows)
         ax.set_ylabel(pool, fontsize=13)
+        sec = chf_axis(ax, pool, "x")
+        if pool == panels[0]:
+            sec.set_xlabel("kCHF (cloud equivalent)", fontsize=10,
+                           color="#555555")
         ax.annotate(f"top {len(rows)} hold {100*top_i/max(tot_i,1):.0f}% of "
                     f"this pool's idle GPU-hours", xy=(0.98, 0.06),
                     xycoords="axes fraction", ha="right", fontsize=10,
                     color="#555555")
     axes[0].set_title("The heavy idle holders differ per pool "
                       "(solid: held idle, pale: active; dashed: one GPU "
-                      "24/7 all month)", loc="left", pad=26)
+                      "24/7 all month)", loc="left", pad=34)
     handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w)
                for w, c in WP_COLOR.items()]
-    axes[0].legend(handles=handles, fontsize=9, loc="lower left",
-                   bbox_to_anchor=(0, 1.0), ncol=5)
+    axes[0].legend(handles=handles, fontsize=9, loc="lower right", ncol=2)
     axes[-1].set_xlabel("GPU-hours in 30 days")
     stamp(axes[-1], window)
     fig.tight_layout()
     save(fig, out, "15_user_greediness_by_pool.png")
 
     # ---- 16 cloud-equivalent cost in CHF (cheapest of AWS/GCP, Jul 2026)
-    USD_GPU_H = {"h100nvl": 6.88, "h100sxm": 6.88,  # AWS p5.48xlarge / 8
-                 "l40s": 2.62,                      # AWS g6e.12xlarge / 4
-                 "amd": 6.88,                       # H100-class (not on AWS/GCP)
-                 "mig3g": 6.88 / 2, "mig1g": 6.88 / 7}
-    CHF_USD = 0.862  # exchange rate used in the NGT budget sheet
     cost_act = defaultdict(float)
     cost_idle = defaultdict(float)
     cost_unk = defaultdict(float)
@@ -603,6 +666,41 @@ def main() -> None:
              "budget rate). Egress, storage and CPU-only nodes excluded.",
              fontsize=9, color="#555555")
     save(fig, out, "16_cloud_cost_chf.png")
+
+    # ---- 17 total held GPU-hours per user, per pool, with kCHF axis
+    tot_pu = defaultdict(float)
+    for r in started:
+        if r["pool"] in FULLGPU:
+            for a, b in r["observed"]["running_intervals"]:
+                tot_pu[(r["pool"], r["user"])] += (b - a) * r["gpus"] / H
+    NT = 10
+    fig, axes = plt.subplots(len(FULLGPU), 1,
+                             figsize=(11, len(FULLGPU) * (0.36 * NT + 1.7)))
+    for ax, pool in zip(axes, FULLGPU):
+        rows = sorted(((u, v) for (p, u), v in tot_pu.items() if p == pool),
+                      key=lambda kv: -kv[1])[:NT]
+        ys = np.arange(len(rows))
+        for y, (user, v) in zip(ys, rows):
+            ax.barh(y, v, color=WP_COLOR.get(wp_of(user), GRAY), alpha=0.95)
+        ax.axvline(30 * 24.0, color="black", linestyle="--", linewidth=1.2)
+        ax.set_yticks(ys, [f"{u} ({wp_of(user=u)})" for u, _ in rows],
+                      fontsize=9)
+        ax.invert_yaxis()
+        ax.set_ylabel(pool, fontsize=13)
+        sec = chf_axis(ax, pool, "x")
+        if pool == FULLGPU[0]:
+            sec.set_xlabel("kCHF (cloud equivalent)", fontsize=10,
+                           color="#555555")
+    axes[0].set_title("Top consumers per pool, in GPU-hours and cloud-"
+                      "equivalent kCHF (dashed: one GPU 24/7 all month)",
+                      loc="left", pad=34)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w)
+               for w, c in WP_COLOR.items()]
+    axes[0].legend(handles=handles, fontsize=9, loc="lower right", ncol=2)
+    axes[-1].set_xlabel("total held GPU-hours in 30 days")
+    stamp(axes[-1], window)
+    fig.tight_layout()
+    save(fig, out, "17_user_total_by_pool.png")
 
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
