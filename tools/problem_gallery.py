@@ -547,6 +547,61 @@ def main() -> None:
     fig.tight_layout()
     save(fig, out, "15_user_greediness_by_pool.png")
 
+    # ---- 16 cloud-equivalent cost in CHF (cheapest of AWS/GCP, Jul 2026)
+    USD_GPU_H = {"h100nvl": 6.88, "h100sxm": 6.88,  # AWS p5.48xlarge / 8
+                 "l40s": 2.62,                      # AWS g6e.12xlarge / 4
+                 "amd": 6.88,                       # H100-class (not on AWS/GCP)
+                 "mig3g": 6.88 / 2, "mig1g": 6.88 / 7}
+    CHF_USD = 0.862  # exchange rate used in the NGT budget sheet
+    cost_act = defaultdict(float)
+    cost_idle = defaultdict(float)
+    cost_unk = defaultdict(float)
+    for r in started:
+        if r["pool"] not in ONPREM:
+            continue
+        rate = USD_GPU_H[r["pool"]] * CHF_USD
+        held = sum(b - a for a, b in r["observed"]["running_intervals"])
+        if r["profile"] and r["pool"] in ("h100nvl", "h100sxm", "l40s"):
+            for dur, u in r["profile"]:
+                chf = dur * r["gpus"] / H * rate
+                (cost_idle if u < 0.05 else cost_act)[r["pool"]] += chf
+        else:
+            cost_unk[r["pool"]] += held * r["gpus"] / H * rate
+    order_c = [p for p in ONPREM
+               if cost_act[p] + cost_idle[p] + cost_unk[p] > 0]
+    tot_chf = sum(cost_act[p] + cost_idle[p] + cost_unk[p] for p in order_c)
+    idle_chf = sum(cost_idle.values())
+    fig, ax = plt.subplots(figsize=(11, 6.5))
+    xs = np.arange(len(order_c))
+    a_ = np.array([cost_act[p] / 1000 for p in order_c])
+    i_ = np.array([cost_idle[p] / 1000 for p in order_c])
+    u_ = np.array([cost_unk[p] / 1000 for p in order_c])
+    ax.bar(xs, a_, 0.6, color=BLUE, label="active")
+    ax.bar(xs, i_, 0.6, bottom=a_, color=RED, alpha=0.85,
+           label="held but idle")
+    ax.bar(xs, u_, 0.6, bottom=a_ + i_, color=GRAY, alpha=0.8,
+           label="no utilization data (MIG, AMD)")
+    for x in xs:
+        ax.annotate(f"{a_[x]+i_[x]+u_[x]:.0f}k", xy=(x, a_[x] + i_[x] + u_[x]),
+                    xytext=(0, 4), textcoords="offset points", ha="center",
+                    fontsize=11)
+    ax.set_xticks(xs, order_c)
+    ax.set_ylim(0, float((a_ + i_ + u_).max()) * 1.14)
+    ax.set_ylabel("cloud-equivalent cost (kCHF per month)")
+    ax.set_title(f"Renting last month's held GPU-hours from the cheapest "
+                 f"public cloud: {tot_chf/1000:.0f} kCHF, of which at least "
+                 f"{idle_chf/1000:.0f} kCHF sat idle", loc="left")
+    stamp(ax, window)
+    ax.legend(fontsize=10)
+    fig.text(0.12, -0.06,
+             "On-demand, cheapest of AWS/GCP, July 2026: H100 6.88 USD/GPU-h "
+             "(AWS p5.48xlarge; GCP A3 10.98), L40S 2.62 USD/GPU-h (AWS\n"
+             "g6e.12xlarge); MIG priced as H100 fractions (1/2, 1/7); MI300X "
+             "not offered by either, priced H100-class. CHF at 0.862 (NGT\n"
+             "budget rate). Egress, storage and CPU-only nodes excluded.",
+             fontsize=9, color="#555555")
+    save(fig, out, "16_cloud_cost_chf.png")
+
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
