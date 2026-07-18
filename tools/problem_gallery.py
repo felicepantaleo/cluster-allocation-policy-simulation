@@ -449,6 +449,59 @@ def main() -> None:
     ax.legend(fontsize=10)
     save(fig, out, "13_pool_idle_active.png")
 
+    # ---- 14 waits while holding nothing (lockouts) vs top-up waits
+    run_by_user = defaultdict(list)
+    for r in reqs:
+        if r["gpus"] > 0 and r["pool"] not in ("cloud_t4", "cpu", "unknown"):
+            for iv in r["observed"].get("running_intervals", []):
+                run_by_user[r["user"]].append((iv[0], iv[1], r["request_id"]))
+
+    def covered(p0, p1, user, exclude):
+        cov = sorted((max(a, p0), min(b, p1))
+                     for a, b, rid in run_by_user[user]
+                     if rid != exclude and min(b, p1) > max(a, p0))
+        tot, cur = 0.0, None
+        for a, b in cov:
+            if cur is None or a > cur[1]:
+                if cur:
+                    tot += cur[1] - cur[0]
+                cur = [a, b]
+            else:
+                cur[1] = max(cur[1], b)
+        if cur:
+            tot += cur[1] - cur[0]
+        return tot / (p1 - p0)
+
+    cats = {"locked out\n(no other GPU pod)": [], "partially covered": [],
+            "top-up\n(other GPU pod running)": []}
+    for r in gpu:
+        w = r["observed"]["wait_s"]
+        if w < 300:
+            continue
+        f = covered(r["submit_time"], r["submit_time"] + w, r["user"],
+                    r["request_id"])
+        key = list(cats)[0 if f < 0.1 else 2 if f > 0.9 else 1]
+        cats[key].append(r["observed"]["outcome"] == "cancelled")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    xs = np.arange(len(cats))
+    got = [sum(1 for c in v if not c) for v in cats.values()]
+    gave = [sum(1 for c in v if c) for v in cats.values()]
+    ax.bar(xs, got, 0.55, color=BLUE, label="eventually got the GPU")
+    ax.bar(xs, gave, 0.55, bottom=got, color=RED, alpha=0.85,
+           label="gave up waiting")
+    for x, g, u in zip(xs, got, gave):
+        ax.annotate(f"{g+u}", xy=(x, g + u), xytext=(0, 4),
+                    textcoords="offset points", ha="center", fontsize=12)
+    ax.set_xticks(xs, list(cats), fontsize=12)
+    ax.set_ylabel("waiting episodes over 5 min, 30 days")
+    n_lock = len(cats[list(cats)[0]])
+    frac_gave = gave[0] / max(n_lock, 1)
+    ax.set_title(f"{n_lock} times a user waited while holding NOTHING on the "
+                 f"GPUs; {100*frac_gave:.0f}% of those gave up", loc="left")
+    stamp(ax, window)
+    ax.legend(fontsize=11)
+    save(fig, out, "14_lockout_waits.png")
+
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
