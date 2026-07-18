@@ -105,39 +105,86 @@ def main() -> None:
 
     user_ns = {s["metric"]["namespace"] for s in load_metric(raw, "user_ns")}
 
+    # a pod NAME can be reused (deleted and recreated); kube_pod_created
+    # changes value at recreation, so distinct created values delimit pod
+    # INSTANCES, and every other metric is sliced into instance windows
+    created_events: dict[tuple, list[tuple]] = defaultdict(list)  # (t, value)
+    for s in load_metric(raw, "created"):
+        m = s["metric"]
+        created_events[(m["namespace"], m["pod"])].extend(
+            (v[0], float(v[1])) for v in s["values"])
+
+    windows: dict[tuple, list[tuple]] = {}  # key -> [(created, w0, w1), ...]
+    for key, evs in created_events.items():
+        evs.sort()
+        vals = []
+        for _, c in evs:
+            if not vals or abs(c - vals[-1]) > 1.0:
+                vals.append(c)
+        vals.sort()
+        windows[key] = [
+            (c, c, vals[i + 1] if i + 1 < len(vals) else float("inf"))
+            for i, c in enumerate(vals)]
+
+    def instance_of(key, t):
+        for i, (_, w0, w1) in enumerate(windows.get(key, ())):
+            if w0 - 600 <= t < w1:
+                return i
+        return None
+
     pods: dict[tuple, dict] = defaultdict(lambda: {
         "phases": defaultdict(list), "requests": defaultdict(float),
         "created": None, "start": None, "node": None})
+
+    def inst_key(m, t):
+        base = (m["namespace"], m["pod"])
+        i = instance_of(base, t)
+        return None if i is None else (m["namespace"], m["pod"], i)
+
+    for base, wins in windows.items():
+        for i, (c, _, _) in enumerate(wins):
+            pods[(base[0], base[1], i)]["created"] = c
     for s in load_metric(raw, "phase"):
         m = s["metric"]
-        pods[(m["namespace"], m["pod"])]["phases"][m["phase"]].extend(
-            v[0] for v in s["values"])
-    for s in load_metric(raw, "created"):
-        m = s["metric"]
-        pods[(m["namespace"], m["pod"])]["created"] = float(s["values"][0][1])
+        for v in s["values"]:
+            k = inst_key(m, v[0])
+            if k:
+                pods[k]["phases"][m["phase"]].append(v[0])
     for s in load_metric(raw, "start_time"):
         m = s["metric"]
-        pods[(m["namespace"], m["pod"])]["start"] = float(s["values"][0][1])
+        for v in s["values"]:
+            k = inst_key(m, v[0])
+            if k and pods[k]["start"] is None:
+                pods[k]["start"] = float(v[1])
     for s in load_metric(raw, "pod_info"):
         m = s["metric"]
-        if m.get("node"):
-            pods[(m["namespace"], m["pod"])]["node"] = m["node"]
+        if not m.get("node"):
+            continue
+        for v in s["values"]:
+            k = inst_key(m, v[0])
+            if k:
+                pods[k]["node"] = m["node"]
+                break
     for s in load_metric(raw, "requests"):
         m = s["metric"]
-        pods[(m["namespace"], m["pod"])]["requests"][m["resource"]] = max(
-            pods[(m["namespace"], m["pod"])]["requests"][m["resource"]],
-            float(s["values"][-1][1]))
+        for v in s["values"]:
+            k = inst_key(m, v[0])
+            if k:
+                pods[k]["requests"][m["resource"]] = max(
+                    pods[k]["requests"][m["resource"]], float(v[1]))
 
     util_by_pod: dict[tuple, dict] = defaultdict(lambda: defaultdict(list))
     for s in load_metric(raw, "gpu_util"):
         m = s["metric"]
-        key = (m.get("namespace", ""), m.get("pod", ""))
+        base = (m.get("namespace", ""), m.get("pod", ""))
         for t, v in s["values"]:
-            util_by_pod[key][t].append(float(v))
+            i = instance_of(base, t)
+            if i is not None:
+                util_by_pod[(base[0], base[1], i)][t].append(float(v))
 
     n_infra = n_nonuser = 0
     requests_out = []
-    for (ns, pod), d in sorted(pods.items()):
+    for (ns, pod, inst), d in sorted(pods.items()):
         if ns not in user_ns:
             n_nonuser += 1
             continue
@@ -162,17 +209,20 @@ def main() -> None:
             if d["requests"].get(res):
                 gpus, gpu_kind = int(d["requests"][res] * scale), kind_
         node = d["node"] or ""
-        pool = pool_of_node(node) if node else (gpu_kind or "unplaced")
+        if gpu_kind in ("mig3g", "mig1g", "amd"):
+            pool = gpu_kind  # resource identifies the pool, wherever placed
+        else:
+            pool = pool_of_node(node) if node else (gpu_kind or "unplaced")
         if pool == "gpu" or (pool == "unknown" and gpu_kind == "gpu"):
             pool = "gpu_unknown"
-        samples = util_by_pod.get((ns, pod), {})
+        samples = util_by_pod.get((ns, pod, inst), {})
         st = sorted(samples)
         profile = compress_profile(
             st, [np.mean(samples[t]) / 100.0 for t in st], 300.0)
         hold = (ended - started) if (started and ended) else 0.0
         requests_out.append({
-            "request_id": f"{ns}/{pod}",
-            "group_id": f"{ns}/{pod}",
+            "request_id": f"{ns}/{pod}#{inst}",
+            "group_id": f"{ns}/{pod}#{inst}",
             "user": ns, "kind": gpu_kind or "cpu", "wp": "",
             "submit_time": created,
             "pool": pool, "gpus": gpus,
