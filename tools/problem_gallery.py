@@ -320,6 +320,36 @@ def main() -> None:
     stamp(ax, window)
     save(fig, out, "08_hold_durations.png")
 
+    # ---- 10 user greediness: idle-held vs active GPU-hours per user
+    per_user = defaultdict(lambda: {"idle": 0.0, "active": 0.0})
+    for r in started:
+        if not r["profile"] or r["pool"] not in FULLGPU:
+            continue
+        d = per_user[r["user"]]
+        for dur, u in r["profile"]:
+            gh_ = dur * r["gpus"] / H
+            d["idle" if u < 0.05 else "active"] += gh_
+    top = sorted(per_user.items(), key=lambda kv: -kv[1]["idle"])[:30]
+    tot_idle = sum(v["idle"] for v in per_user.values())
+    top10_share = sum(v["idle"] for _, v in top[:10]) / tot_idle
+    fig, ax = plt.subplots(figsize=(11, 0.34 * len(top) + 2.5))
+    ys = np.arange(len(top))
+    for y, (user, d) in zip(ys, top):
+        c = WP_COLOR.get(wp_of(user), GRAY)
+        ax.barh(y, d["idle"], color=c, alpha=0.95)
+        ax.barh(y, d["active"], left=d["idle"], color=c, alpha=0.30)
+    ax.set_yticks(ys, [f"{u} ({wp_of(user=u)})" for u, _ in top], fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlabel("GPU-hours in 30 days (solid: held idle, pale: active)")
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w)
+               for w, c in WP_COLOR.items()]
+    ax.legend(handles=handles, fontsize=10, loc="lower right")
+    ax.set_title(f"Ten users hold {100*top10_share:.0f}% of all idle "
+                 "GPU-hours; idleness, not usage, ranks the heavy holders",
+                 loc="left")
+    stamp(ax, window)
+    save(fig, out, "10_user_greediness.png")
+
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
