@@ -359,6 +359,36 @@ def main() -> None:
     stamp(ax, window)
     save(fig, out, "10_user_greediness.png")
 
+    # ---- 11 total held GPU-hours per user vs the single-GPU line
+    tot_user = defaultdict(float)
+    for r in started:
+        if r["pool"] not in FULLGPU:
+            continue
+        for a, b in r["observed"]["running_intervals"]:
+            tot_user[r["user"]] += (b - a) * r["gpus"] / H
+    topt = sorted(tot_user.items(), key=lambda kv: -kv[1])[:30]
+    allowance = 30 * 24.0
+    n_over_t = sum(1 for v in tot_user.values() if v > allowance)
+    fig, ax = plt.subplots(figsize=(11, 0.34 * len(topt) + 2.5))
+    ys = np.arange(len(topt))
+    for y, (user, v) in zip(ys, topt):
+        ax.barh(y, v, color=WP_COLOR.get(wp_of(user), GRAY), alpha=0.95)
+    ax.axvline(allowance, color="black", linestyle="--", linewidth=1.4)
+    ax.text(allowance, len(topt) - 0.4, "  one GPU held 24/7 all month "
+            f"({allowance:.0f} GPU-h)", rotation=90, va="bottom", ha="right",
+            fontsize=10)
+    ax.set_yticks(ys, [f"{u} ({wp_of(user=u)})" for u, _ in topt], fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlabel("total held GPU-hours in 30 days (full-GPU pools)")
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w)
+               for w, c in WP_COLOR.items()]
+    ax.legend(handles=handles, fontsize=10, loc="lower right")
+    ax.set_title(f"{n_over_t} users held more than one GPU-month; the top "
+                 f"holder used {topt[0][1] / allowance:.1f} GPUs' worth "
+                 "around the clock", loc="left")
+    stamp(ax, window)
+    save(fig, out, "11_user_total_hours.png")
+
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
