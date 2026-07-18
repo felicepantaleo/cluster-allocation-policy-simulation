@@ -389,6 +389,66 @@ def main() -> None:
     stamp(ax, window)
     save(fig, out, "11_user_total_hours.png")
 
+    # ---- 12 pool usage stacked by WP
+    pool_wp = defaultdict(lambda: defaultdict(float))
+    for r in started:
+        if r["pool"] not in ONPREM:
+            continue
+        for a, b in r["observed"]["running_intervals"]:
+            pool_wp[r["pool"]][wp_of(r["user"])] += (b - a) * r["gpus"] / H
+    order_p = [p for p in ONPREM if pool_wp.get(p)]
+    wps = ["WP1", "WP2", "WP3", "WP4", "outside roster"]
+    fig, ax = plt.subplots(figsize=(11, 6.5))
+    xs = np.arange(len(order_p))
+    bottom = np.zeros(len(order_p))
+    for w in wps:
+        vals = np.array([pool_wp[p].get(w, 0.0) for p in order_p])
+        ax.bar(xs, vals, 0.62, bottom=bottom, color=WP_COLOR[w], label=w)
+        bottom += vals
+    for x, p in zip(xs, order_p):
+        ax.annotate(f"{bottom[x]:.0f}", xy=(x, bottom[x]), xytext=(0, 4),
+                    textcoords="offset points", ha="center", fontsize=11)
+    ax.set_xticks(xs, order_p)
+    ax.set_ylabel("held GPU- or slice-hours in 30 days")
+    dom = {p: max(pool_wp[p], key=pool_wp[p].get) for p in order_p}
+    ax.set_title("Who uses which pool: H100 NVL dominates the volume; "
+                 f"SXM is mostly {dom.get('h100sxm', '?')}", loc="left")
+    stamp(ax, window)
+    ax.legend(fontsize=10)
+    fig.text(0.12, -0.02, "MIG bars count slice-hours, not GPU-hours.",
+             fontsize=10, color="#555555")
+    save(fig, out, "12_pool_usage_by_wp.png")
+
+    # ---- 13 idle vs active per pool (DCGM-covered)
+    pool_ia = defaultdict(lambda: {"idle": 0.0, "active": 0.0})
+    for r in started:
+        if not r["profile"] or r["pool"] not in FULLGPU:
+            continue
+        for dur, u in r["profile"]:
+            pool_ia[r["pool"]]["idle" if u < 0.05 else "active"] += \
+                dur * r["gpus"] / H
+    order_f = [p for p in FULLGPU if pool_ia.get(p)]
+    fig, ax = plt.subplots(figsize=(10, 6))
+    xs = np.arange(len(order_f))
+    act = [pool_ia[p]["active"] for p in order_f]
+    idl = [pool_ia[p]["idle"] for p in order_f]
+    ax.bar(xs, act, 0.6, color=BLUE, label="active GPU-hours")
+    ax.bar(xs, idl, 0.6, bottom=act, color=RED, alpha=0.85,
+           label="held but idle (GPU util < 5%)")
+    for x, a_, i_ in zip(xs, act, idl):
+        ax.annotate(f"{100*i_/(a_+i_):.0f}% idle", xy=(x, a_ + i_),
+                    xytext=(0, 4), textcoords="offset points", ha="center",
+                    fontsize=11)
+    ax.set_xticks(xs, order_f)
+    ax.set_ylabel("GPU-hours in 30 days (DCGM-covered)")
+    worst = max(order_f, key=lambda p: pool_ia[p]["idle"] /
+                max(pool_ia[p]["idle"] + pool_ia[p]["active"], 1))
+    ax.set_title("Idle holding by pool: every pool wastes most of its held "
+                 f"hours; {worst} is the worst", loc="left")
+    stamp(ax, window)
+    ax.legend(fontsize=10)
+    save(fig, out, "13_pool_idle_active.png")
+
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
