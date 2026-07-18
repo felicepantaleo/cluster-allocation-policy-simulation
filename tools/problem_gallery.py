@@ -502,6 +502,51 @@ def main() -> None:
     ax.legend(fontsize=11)
     save(fig, out, "14_lockout_waits.png")
 
+    # ---- 15 greediness by pool: idle vs active per user, per pool
+    pu = defaultdict(lambda: {"idle": 0.0, "active": 0.0})
+    for r in started:
+        if not r["profile"] or r["pool"] not in ("h100nvl", "h100sxm", "l40s"):
+            continue
+        for dur, u in r["profile"]:
+            pu[(r["pool"], r["user"])]["idle" if u < 0.05 else "active"] += \
+                dur * r["gpus"] / H
+    panels = ("h100nvl", "h100sxm", "l40s")
+    NTOP = 12
+    fig, axes = plt.subplots(len(panels), 1,
+                             figsize=(11, len(panels) * (0.36 * NTOP + 1.6)))
+    allowance = 30 * 24.0
+    for ax, pool in zip(axes, panels):
+        rows = sorted(((u, d) for (p, u), d in pu.items() if p == pool),
+                      key=lambda kv: -kv[1]["idle"])[:NTOP]
+        ys = np.arange(len(rows))
+        for y, (user, d) in zip(ys, rows):
+            c = WP_COLOR.get(wp_of(user), GRAY)
+            ax.barh(y, d["idle"], color=c, alpha=0.95)
+            ax.barh(y, d["active"], left=d["idle"], color=c, alpha=0.30)
+        ax.axvline(allowance, color="black", linestyle="--", linewidth=1.2)
+        ax.set_yticks(ys, [f"{u} ({wp_of(user=u)})" for u, _ in rows],
+                      fontsize=9)
+        ax.invert_yaxis()
+        tot_i = sum(d["idle"] for _, d in
+                    ((k, v) for k, v in pu.items() if k[0] == pool))
+        top_i = sum(d["idle"] for _, d in rows)
+        ax.set_ylabel(pool, fontsize=13)
+        ax.annotate(f"top {len(rows)} hold {100*top_i/max(tot_i,1):.0f}% of "
+                    f"this pool's idle GPU-hours", xy=(0.98, 0.06),
+                    xycoords="axes fraction", ha="right", fontsize=10,
+                    color="#555555")
+    axes[0].set_title("The heavy idle holders differ per pool "
+                      "(solid: held idle, pale: active; dashed: one GPU "
+                      "24/7 all month)", loc="left", pad=26)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w)
+               for w, c in WP_COLOR.items()]
+    axes[0].legend(handles=handles, fontsize=9, loc="lower left",
+                   bbox_to_anchor=(0, 1.0), ncol=5)
+    axes[-1].set_xlabel("GPU-hours in 30 days")
+    stamp(axes[-1], window)
+    fig.tight_layout()
+    save(fig, out, "15_user_greediness_by_pool.png")
+
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
