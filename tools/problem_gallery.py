@@ -332,20 +332,29 @@ def main() -> None:
     top = sorted(per_user.items(), key=lambda kv: -kv[1]["idle"])[:30]
     tot_idle = sum(v["idle"] for v in per_user.values())
     top10_share = sum(v["idle"] for _, v in top[:10]) / tot_idle
+    # the P1 development allowance: one GPU held around the clock for the
+    # whole window may legitimately sit mostly idle
+    allowance = 30 * 24.0
+    excess = sum(max(0.0, v["idle"] - allowance) for v in per_user.values())
+    n_over = sum(1 for v in per_user.values() if v["idle"] > allowance)
     fig, ax = plt.subplots(figsize=(11, 0.34 * len(top) + 2.5))
     ys = np.arange(len(top))
     for y, (user, d) in zip(ys, top):
         c = WP_COLOR.get(wp_of(user), GRAY)
         ax.barh(y, d["idle"], color=c, alpha=0.95)
         ax.barh(y, d["active"], left=d["idle"], color=c, alpha=0.30)
+    ax.axvline(allowance, color="black", linestyle="--", linewidth=1.4)
+    ax.text(allowance, len(top) - 0.4, "  one dev GPU held 24/7 all month "
+            f"({allowance:.0f} GPU-h)", rotation=90, va="bottom", ha="right",
+            fontsize=10)
     ax.set_yticks(ys, [f"{u} ({wp_of(user=u)})" for u, _ in top], fontsize=9)
     ax.invert_yaxis()
     ax.set_xlabel("GPU-hours in 30 days (solid: held idle, pale: active)")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w)
                for w, c in WP_COLOR.items()]
     ax.legend(handles=handles, fontsize=10, loc="lower right")
-    ax.set_title(f"Ten users hold {100*top10_share:.0f}% of all idle "
-                 "GPU-hours; idleness, not usage, ranks the heavy holders",
+    ax.set_title(f"{n_over} users hold more idle GPU-time than a full-time "
+                 f"dev GPU; {excess:.0f} GPU-hours sit above that allowance",
                  loc="left")
     stamp(ax, window)
     save(fig, out, "10_user_greediness.png")
