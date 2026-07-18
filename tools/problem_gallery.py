@@ -261,17 +261,15 @@ def main() -> None:
     xs = np.arange(len(order))
     ax.bar(xs, [v / tot * 100 for v in vals],
            color=[WP_COLOR[k] for k in order], alpha=0.9)
-    for i, tgt in enumerate(targets):
-        ax.hlines(tgt * wp_tot / tot * 100, i - 0.42, i + 0.42,
-                  color="black", linewidth=2.0,
-                  label="PMC target (30/30/30/10 of WP total)" if i == 0 else None)
+    for x, v in zip(xs, vals):
+        ax.annotate(f"{v / tot * 100:.0f}%", xy=(x, v / tot * 100),
+                    xytext=(0, 4), textcoords="offset points", ha="center",
+                    fontsize=12)
     ax.set_xticks(xs, order)
     ax.set_ylabel("share of full-GPU hours (%)")
-    ax.set_title(f"{100*vals[4]/tot:.0f}% of GPU-hours go to users outside "
-                 "the WP roster; WP shares are far from 30/30/30/10",
-                 loc="left")
+    ax.set_title(f"Who gets the GPU-hours: {100*vals[4]/tot:.0f}% go to "
+                 "users outside the WP roster", loc="left")
     stamp(ax, window)
-    ax.legend(fontsize=12)
     save(fig, out, "06_wp_shares.png")
 
     # ---- 07 unsatisfied requests
