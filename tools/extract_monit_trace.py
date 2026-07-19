@@ -38,7 +38,30 @@ METRICS = {
     "requests": ("kube_pod_container_resource_requests", 600),
     "cordon": ("kube_node_spec_unschedulable == 1", 300),
     "gpu_util": ("DCGM_FI_DEV_GPU_UTIL", 300),
+    "cpu_rate": ('sum by (namespace, pod) '
+                 '(rate(container_cpu_usage_seconds_total'
+                 '{container!="",container!="POD"}[5m]))', 300),
     "user_ns": ('kube_namespace_labels{label_app_kubernetes_io_part_of="kubeflow-profile"}', 3600),
+    # full dump so the Grafana/Prometheus backend is no longer needed
+    "gpu_fb_used": ("DCGM_FI_DEV_FB_USED", 300),
+    "gpu_engine": ("DCGM_FI_PROF_GR_ENGINE_ACTIVE", 300),
+    "gpu_power": ("DCGM_FI_DEV_POWER_USAGE", 300),
+    "mem_usage": ('sum by (namespace, pod) '
+                  '(container_memory_working_set_bytes'
+                  '{container!="",container!="POD"})', 300),
+    "net_rx": ('sum by (namespace, pod) '
+               '(rate(container_network_receive_bytes_total[5m]))', 600),
+    "net_tx": ('sum by (namespace, pod) '
+               '(rate(container_network_transmit_bytes_total[5m]))', 600),
+    "limits": ("kube_pod_container_resource_limits", 600),
+    "pod_ready": ('kube_pod_status_ready{condition="true"} == 1', 600),
+    "completion": ("kube_pod_completion_time", 600),
+    "node_info": ("kube_node_info", 3600),
+    "node_alloc": ("kube_node_status_allocatable", 3600),
+    "node_capacity": ("kube_node_status_capacity", 3600),
+    "node_condition": ('kube_node_status_condition{status="true"} == 1', 600),
+    "machine_cores": ("machine_cpu_cores", 3600),
+    "ns_labels": ("kube_namespace_labels", 3600),
 }
 
 
