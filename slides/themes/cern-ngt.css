@@ -1,0 +1,182 @@
+/* @theme cern-ngt */
+
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  --cern-blue: #0033a0;
+  --cern-dark: #08142b;
+  --cern-mid: #123a86;
+  --cern-light: #eef5ff;
+  --accent: #49b4ff;
+  --muted: #5c6f8d;
+  --border: #d9e8ff;
+}
+
+section {
+  background: linear-gradient(135deg, #ffffff 0%, #f6f9ff 58%, #eaf3ff 100%);
+  color: var(--cern-dark);
+  font-size: 28px;
+  padding: 64px 78px 58px 78px;
+}
+
+section::before { content: none; }
+
+section.lead {
+  background: radial-gradient(circle at 82% 45%, rgba(73, 180, 255, 0.28) 0%, rgba(73, 180, 255, 0.10) 22%, transparent 42%), linear-gradient(135deg, #0033a0 0%, #08142b 76%);
+  color: white;
+}
+
+section.lead::before { content: none; }
+
+section.inverse {
+  background: linear-gradient(135deg, #08142b 0%, #0033a0 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+section.inverse::before { display: none; }
+
+h1 {
+  color: var(--cern-blue);
+  font-size: 51px;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  margin-bottom: 0.45em;
+}
+
+section.lead h1,
+section.inverse h1 { color: white; }
+
+h2 {
+  color: var(--cern-blue);
+  font-size: 36px;
+  margin-top: 0;
+  margin-bottom: 0.35em;
+}
+
+section.lead h2,
+section.inverse h2 { color: white; }
+
+h3 {
+  color: var(--cern-mid);
+  font-size: 25px;
+  margin-bottom: 0.25em;
+}
+
+section.inverse h3 { color: #bfe4ff; }
+p { line-height: 1.25; }
+strong { color: var(--cern-blue); }
+section.lead strong, section.inverse strong { color: #bfe4ff; }
+ul { margin-top: 0.25em; padding-left: 1.1em; }
+li { margin-bottom: 0.24em; }
+blockquote {
+  border-left: 8px solid var(--accent);
+  margin-left: 0;
+  padding-left: 24px;
+  font-size: 35px;
+  font-weight: 700;
+  line-height: 1.18;
+}
+.small { font-size: 21px; }
+.tiny { font-size: 17px; }
+.caption { font-size: 20px; color: var(--muted); }
+.inverse .caption, .lead .caption { color: rgba(255,255,255,0.74); }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 42px; align-items: start; }
+.columns-60-40 { display: grid; grid-template-columns: 1.55fr 1fr; gap: 42px; align-items: center; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.card {
+  background: rgba(255, 255, 255, 0.86);
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 20px 22px;
+  min-height: 185px;
+  box-shadow: 0 10px 24px rgba(0, 51, 160, 0.06);
+}
+.card.compact { min-height: 100px; }
+.card.short { min-height: 136px; }
+.card.theme { display: flex; flex-direction: column; }
+.coordinator { margin-top: auto; padding-top: 9px; border-top: 1px solid var(--border); font-size: 15px; color: var(--cern-mid); line-height: 1.28; }
+.inverse .card, .lead .card {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(191, 228, 255, 0.32);
+  box-shadow: none;
+}
+.metric { font-size: 51px; font-weight: 800; color: var(--cern-blue); line-height: 1; }
+.inverse .metric, .lead .metric { color: #bfe4ff; }
+.program-grid { display: grid; grid-template-columns: 0.62fr 1fr; gap: 12px 22px; align-items: start; font-size: 22px; }
+.date { color: var(--cern-blue); font-weight: 800; white-space: nowrap; }
+.inverse .date { color: #bfe4ff; }
+.seminar-grid { display: grid; grid-template-columns: 0.28fr 1fr; gap: 14px 18px; font-size: 20px; }
+.bigline { font-size: 42px; font-weight: 800; line-height: 1.08; letter-spacing: -0.03em; }
+.qr { width: 230px; background: white; border-radius: 18px; padding: 15px; box-shadow: 0 10px 28px rgba(0,0,0,0.12); }
+.committee-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; font-size: 22px; }
+.member { border-bottom: 1px solid rgba(0, 51, 160, 0.12); padding: 6px 0; }
+.member strong { font-size: 22px; }
+.partner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; font-size: 22px; margin: 8px 0; }
+.partner-grid div { border-bottom: 1px solid rgba(0, 51, 160, 0.12); padding: 5px 0; font-weight: 700; color: var(--cern-blue); }
+.team-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; align-items: start; margin-top: 6px; }
+.team-member { text-align: center; }
+.team-photo { width: 148px; height: 148px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border); box-shadow: 0 8px 20px rgba(0, 51, 160, 0.12); }
+.team-member .name { font-weight: 800; color: var(--cern-blue); font-size: 20px; margin-top: 12px; }
+.team-member .role { font-size: 16px; color: var(--muted); line-height: 1.22; }
+section.inverse .team-member .name, section.lead .team-member .name { color: #bfe4ff; }
+section.inverse .team-member .role, section.lead .team-member .role { color: rgba(255, 255, 255, 0.74); }
+section.lead footer, section.lead header, section.inverse footer, section.inverse header { color: rgba(255,255,255,0.65); }
+section > footer {
+  position: absolute;
+  left: 78px;
+  bottom: 22px;
+  margin: 0;
+  padding: 0;
+  font-size: 15px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+section > footer img {
+  height: 30px;
+  vertical-align: middle;
+  margin: 0 9px;
+  background: #fff;
+  padding: 2px;
+  border-radius: 5px;
+}
+section.lead .sponsor {
+  position: absolute;
+  left: 78px;
+  bottom: 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+section.lead .sponsor span { font-size: 17px; color: rgba(255, 255, 255, 0.78); }
+section.lead .sponsor img {
+  height: 52px;
+  background: #fff;
+  padding: 9px 16px;
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+.closing-logo {
+  display: block;
+  margin: 20px auto 12px auto;
+  height: 208px;
+  background: #fff;
+  padding: 20px 28px;
+  border-radius: 22px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.30);
+}
+.intro-display {
+  display: block;
+  margin: 18px auto 6px auto;
+  max-height: 340px;
+  max-width: 90%;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  box-shadow: 0 12px 30px rgba(0, 51, 160, 0.16);
+}
+
+section img { display: block; margin-left: auto; margin-right: auto; }
+section blockquote { font-size: 24px; }
