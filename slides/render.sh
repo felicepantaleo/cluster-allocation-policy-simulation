@@ -18,9 +18,9 @@ for pid in $(ps -u "$USER" -o pid=,args= | grep -E "bin/mar[p] |firefox.*-headle
     kill -9 "$pid" 2>/dev/null && echo "killed stale render process $pid"
 done
 
-$MARP ngt_allocation_problem.marp.md --theme-set themes/cern-ngt.css \
+$MARP ngt_allocation_problem.marp.md --theme-set themes/cern-ngt.css --no-stdin \
       --html --allow-local-files -o ngt_allocation_problem.html
-timeout 120 $MARP ngt_allocation_problem.marp.md --theme-set themes/cern-ngt.css \
+timeout 120 $MARP ngt_allocation_problem.marp.md --theme-set themes/cern-ngt.css --no-stdin \
       --allow-local-files --browser firefox --pdf -o ngt_allocation_problem.pdf \
     || { echo "PDF step timed out; re-run once (stale processes were cleaned)"; exit 1; }
 ls -la ngt_allocation_problem.html ngt_allocation_problem.pdf
