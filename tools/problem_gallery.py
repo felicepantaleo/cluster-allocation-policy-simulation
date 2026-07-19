@@ -803,6 +803,53 @@ def main() -> None:
              fontsize=9, color="#555555")
     save(fig, out, "19_wp_gpu_months.png")
 
+    # ---- 21 peak concurrency per user: how many pods and GPUs at once
+    def peak_of(events):
+        lvl = mx = 0
+        for _, d in sorted(events):
+            lvl += d
+            mx = max(mx, lvl)
+        return mx
+
+    ev_g = defaultdict(list)
+    ev_p = defaultdict(list)
+    for r in started:
+        if r["pool"] not in ONPREM:
+            continue
+        for a, b in r["observed"]["running_intervals"]:
+            ev_p[r["user"]] += [(a, 1), (b, -1)]
+            if r["pool"] in FULLGPU:
+                ev_g[r["user"]] += [(a, r["gpus"]), (b, -r["gpus"])]
+    peak_g = {u: peak_of(e) for u, e in ev_g.items()}
+    peak_p = {u: peak_of(e) for u, e in ev_p.items()}
+    topc = sorted(peak_g.items(), key=lambda kv: -kv[1])[:25]
+    n_multi_pod = sum(1 for u in peak_p if peak_p[u] > 1)
+    fig, (axg, axp) = plt.subplots(1, 2, figsize=(12, 0.34 * len(topc) + 2.5),
+                                   sharey=True)
+    ys = np.arange(len(topc))
+    for y, (user, pg) in zip(ys, topc):
+        c = WP_COLOR.get(wp_of(user), GRAY)
+        axg.barh(y, pg, color=c, alpha=0.95)
+        axp.barh(y, peak_p.get(user, 0), color=c, alpha=0.95)
+    axg.set_yticks(ys, [f"{u} ({wp_of(user=u)})" for u, _ in topc],
+                   fontsize=9)
+    axg.invert_yaxis()
+    for ax_, lbl in ((axg, "peak concurrent GPUs (full-GPU pools)"),
+                     (axp, "peak concurrent pods (all pools)")):
+        ax_.set_xlabel(lbl, fontsize=11)
+        ax_.tick_params(axis="y", which="both", right=False)
+    axg.set_title(f"Peak concurrency per user: "
+                  f"{sum(1 for v in peak_g.values() if v >= 8)} users reached "
+                  f"8 or more GPUs at once; {n_multi_pod} of "
+                  f"{len(peak_p)} users ran multiple pods simultaneously",
+                  loc="left", fontsize=14)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w_)
+               for w_, c in WP_COLOR.items()]
+    axp.legend(handles=handles, fontsize=9, loc="lower right")
+    stamp(axg, window)
+    fig.tight_layout()
+    save(fig, out, "21_user_peak_concurrency.png")
+
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
