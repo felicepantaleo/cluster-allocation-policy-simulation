@@ -81,6 +81,9 @@ def stamp(ax, window):
 
 def save(fig, out, name):
     fig.savefig(out / name, dpi=150, bbox_inches="tight")
+    svg = out / "svg" / name.replace(".png", ".svg")
+    svg.parent.mkdir(exist_ok=True)
+    fig.savefig(svg, bbox_inches="tight")  # vector copy for slides
     plt.close(fig)
     print("wrote", name)
 
@@ -705,6 +708,100 @@ def main() -> None:
     stamp(axes[-1], window)
     fig.tight_layout()
     save(fig, out, "17_user_total_by_pool.png")
+
+    # ---- 18/19 price-weighted GPU-months (cross-pool sums become
+    # meaningful: weight = cloud price ratio to H100; 1 GPU-month = 720 h
+    # of H100 equivalent)
+    W = {p: USD_GPU_H[p] / USD_GPU_H["h100nvl"] for p in USD_GPU_H}
+    GPU_MONTH_H = 720.0
+    KCHF_PER_MONTH = USD_GPU_H["h100nvl"] * CHF_USD * GPU_MONTH_H / 1000.0
+
+    def month_axis(ax, axis="x"):
+        fwd = (lambda v: v * KCHF_PER_MONTH)
+        inv = (lambda v: v / KCHF_PER_MONTH)
+        if axis == "x":
+            ax.tick_params(axis="x", which="both", top=False, labeltop=False)
+            sec = ax.secondary_xaxis("top", functions=(fwd, inv))
+        else:
+            ax.tick_params(axis="y", which="both", right=False,
+                           labelright=False)
+            sec = ax.secondary_yaxis("right", functions=(fwd, inv))
+        sec.tick_params(labelsize=9, colors="#555555")
+        return sec
+
+    um = defaultdict(lambda: {"idle": 0.0, "active": 0.0, "unmon": 0.0})
+    for r in started:
+        if r["pool"] not in ONPREM:
+            continue
+        w = W[r["pool"]] / GPU_MONTH_H
+        d = um[r["user"]]
+        if r["profile"] and r["pool"] in ("h100nvl", "h100sxm", "l40s"):
+            for dur, u in r["profile"]:
+                d["idle" if u < 0.05 else "active"] += dur * r["gpus"] / H * w
+        else:
+            for a, b in r["observed"]["running_intervals"]:
+                d["unmon"] += (b - a) * r["gpus"] / H * w
+
+    top = sorted(um.items(), key=lambda kv: -sum(kv[1].values()))[:30]
+    n_over_m = sum(1 for v in um.values() if sum(v.values()) > 1.0)
+    fig, ax = plt.subplots(figsize=(11, 0.34 * len(top) + 2.8))
+    ys = np.arange(len(top))
+    for y, (user, d) in zip(ys, top):
+        c = WP_COLOR.get(wp_of(user), GRAY)
+        ax.barh(y, d["idle"], color=c, alpha=0.95)
+        ax.barh(y, d["active"], left=d["idle"], color=c, alpha=0.30)
+        ax.barh(y, d["unmon"], left=d["idle"] + d["active"], color=GRAY,
+                alpha=0.55)
+    ax.axvline(1.0, color="black", linestyle="--", linewidth=1.4)
+    ax.set_yticks(ys, [f"{u} ({wp_of(user=u)})" for u, _ in top], fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlabel("price-weighted GPU-months in 30 days "
+                  "(H100 equivalent; solid: idle, pale: active, gray: "
+                  "no utilization data)")
+    sec = month_axis(ax, "x")
+    sec.set_xlabel("kCHF (cloud equivalent)", fontsize=10, color="#555555")
+    ax.set_title(f"{n_over_m} users held more than one H100-equivalent "
+                 "GPU-month; dashed: one H100 24/7", loc="left", pad=30)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=w_)
+               for w_, c in WP_COLOR.items()]
+    ax.legend(handles=handles, fontsize=9, loc="lower right", ncol=2)
+    stamp(ax, window)
+    save(fig, out, "18_user_gpu_months.png")
+
+    wm = defaultdict(lambda: {"idle": 0.0, "active": 0.0, "unmon": 0.0})
+    for user, d in um.items():
+        k = wp_of(user)
+        for key in d:
+            wm[k][key] += d[key]
+    order_w = ["WP1", "WP2", "WP3", "WP4", "outside roster"]
+    fig, ax = plt.subplots(figsize=(11, 6.5))
+    xs = np.arange(len(order_w))
+    idle_v = np.array([wm[k]["idle"] for k in order_w])
+    act_v = np.array([wm[k]["active"] for k in order_w])
+    unm_v = np.array([wm[k]["unmon"] for k in order_w])
+    ax.bar(xs, idle_v, 0.6, color=RED, alpha=0.85, label="idle")
+    ax.bar(xs, act_v, 0.6, bottom=idle_v, color=BLUE, label="active")
+    ax.bar(xs, unm_v, 0.6, bottom=idle_v + act_v, color=GRAY, alpha=0.6,
+           label="no utilization data")
+    for x in xs:
+        tot_x = idle_v[x] + act_v[x] + unm_v[x]
+        ax.annotate(f"{tot_x:.1f}", xy=(x, tot_x), xytext=(0, 4),
+                    textcoords="offset points", ha="center", fontsize=11)
+    ax.set_xticks(xs, order_w)
+    ax.tick_params(axis="x", which="both", bottom=False, top=False)
+    ax.set_ylabel("price-weighted GPU-months in 30 days")
+    sec = month_axis(ax, "y")
+    sec.set_ylabel("kCHF (cloud equivalent)", fontsize=10, color="#555555")
+    tot_m = idle_v.sum() + act_v.sum() + unm_v.sum()
+    ax.set_title(f"Held GPU time by WP: {tot_m:.0f} H100-equivalent "
+                 f"GPU-months in one month, {idle_v.sum():.0f} of them idle",
+                 loc="left")
+    stamp(ax, window)
+    ax.legend(fontsize=10)
+    fig.text(0.12, -0.02, "Weights: cloud price ratio to H100 (L40S 0.38, "
+             "MIG 3g 0.50, MIG 1g 0.14, AMD 1.0); 1 GPU-month = 720 h.",
+             fontsize=9, color="#555555")
+    save(fig, out, "19_wp_gpu_months.png")
 
     # ---- 09 cordons
     fig, ax = plt.subplots(figsize=(13, 5.5))

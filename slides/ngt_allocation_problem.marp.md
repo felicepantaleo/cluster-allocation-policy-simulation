@@ -3,7 +3,6 @@ marp: true
 theme: cern-ngt
 paginate: true
 size: 16:9
-header: NGT resource allocation
 footer: NGT PMC, July 2026
 ---
 
@@ -74,7 +73,7 @@ manual classification: 99.4% of GPU-hours attributed.
 
 # Waiting times
 
-![h:470](plots/02_waits.png)
+![h:430](plots/02_waits.svg)
 
 75 to 90% of requests are satisfied immediately; the H100 NVL p95 wait is 15.5 h.
 
@@ -82,7 +81,7 @@ manual classification: 99.4% of GPU-hours attributed.
 
 # The Pending queue
 
-![h:470](plots/03_pending_backlog.png)
+![h:430](plots/03_pending_backlog.png)
 
 Peak backlog: 32 simultaneous Pending requests, stacked by target pool.
 
@@ -90,7 +89,7 @@ Peak backlog: 32 simultaneous Pending requests, stacked by target pool.
 
 # Lockouts
 
-![h:420](plots/14_lockout_waits.png)
+![h:400](plots/14_lockout_waits.svg)
 
 Over half of all queue pressure is top-up demand from users already running.
 
@@ -98,7 +97,7 @@ Over half of all queue pressure is top-up demand from users already running.
 
 # Idle held GPU-hours
 
-![bg right:56% fit](plots/04_idle_gpu_hours.png)
+![bg right:56% fit](plots/04_idle_gpu_hours.svg)
 
 - 53 000 GPU-hours parked in 30 days
 - 267 kCHF/month cloud equivalent
@@ -109,7 +108,7 @@ Over half of all queue pressure is top-up demand from users already running.
 
 # Idle share by pool
 
-![h:440](plots/13_pool_idle_active.png)
+![h:410](plots/13_pool_idle_active.svg)
 
 The L40S pool is idle for 91% of its DCGM-covered held hours.
 
@@ -117,7 +116,7 @@ The L40S pool is idle for 91% of its DCGM-covered held hours.
 
 # Heavy idle holders
 
-![bg right:54% fit](plots/10_user_greediness.png)
+![bg right:54% fit](plots/10_user_greediness.svg)
 
 - Solid = held idle, pale = active
 - Dashed line: one dev GPU held 24/7 all month (720 GPU-h), the legitimate
@@ -131,7 +130,7 @@ The L40S pool is idle for 91% of its DCGM-covered held hours.
 
 # Idle holders by pool
 
-![bg right:54% fit](plots/15_user_greediness_by_pool.png)
+![bg right:54% fit](plots/15_user_greediness_by_pool.svg)
 
 - NVL: broad behavior, top 12 hold 66% of idle
 - SXM: three users own the idle hours
@@ -143,7 +142,7 @@ The L40S pool is idle for 91% of its DCGM-covered held hours.
 
 # Cloud-equivalent cost
 
-![h:440](plots/16_cloud_cost_chf.png)
+![h:410](plots/16_cloud_cost_chf.svg)
 
 Rental equivalent: 480 kCHF/month, of which at least 267 kCHF idle
 (3.2 MCHF/year). On-demand rates, July 2026; egress and storage excluded.
@@ -152,7 +151,7 @@ Rental equivalent: 480 kCHF/month, of which at least 267 kCHF idle
 
 # GPU-hours by WP
 
-![h:440](plots/06_wp_shares.png)
+![h:410](plots/06_wp_shares.svg)
 
 WP2 is on its 30% target organically; WP3 runs at 47% (CMS production
 and CI included); WP1 at 22%; WP4 consumes nothing yet.
@@ -225,19 +224,19 @@ and tunable on the real trace.
 
 # Backup: unsatisfied requests
 
-![h:470](plots/07_unsatisfied.png)
+![h:430](plots/07_unsatisfied.svg)
 
 ---
 
 # Backup: hold durations
 
-![h:470](plots/08_hold_durations.png)
+![h:430](plots/08_hold_durations.svg)
 
 ---
 
 # Backup: top consumers per pool
 
-![bg right:54% fit](plots/17_user_total_by_pool.png)
+![bg right:54% fit](plots/17_user_total_by_pool.svg)
 
 - Secondary axis: cloud-equivalent kCHF, cheapest of AWS/GCP, July 2026
 - Dashed: one GPU 24/7 all month
@@ -251,13 +250,13 @@ and tunable on the real trace.
 
 <div>
 
-![h:330](plots/12_pool_usage_by_wp.png)
+![h:330](plots/12_pool_usage_by_wp.svg)
 
 </div>
 
 <div>
 
-![h:330](plots/09_cordons.png)
+![h:330](plots/09_cordons.svg)
 
 </div>
 
