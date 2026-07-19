@@ -70,7 +70,8 @@ POLICIES = {
     # Single-GPU interactive sessions stay exactly as observed.
     "batch_multi_queue": {"_policy": "ngt_principles", "_batch": True,
                           "reserve": {"h100nvl": 4, "l40s": 1},
-                          "multi_gpu_cap_h": 1e6},
+                          "multi_gpu_cap_h": 1e6,
+                          "max_interactive_per_user": 1},
 }
 
 

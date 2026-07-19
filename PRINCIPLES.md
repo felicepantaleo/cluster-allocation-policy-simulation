@@ -95,11 +95,14 @@ as a batch job, executes, and exits at completion, behind a queue that
 accounts for the priorities of all jobs (guaranteed 1-GPU tier first, then
 working-package fair share). Interactive sessions remain single-GPU only.
 Under this variant P3's time limit is realized by exit-at-end rather than
-a wall-clock cap. Replayed on the real month (tools/replay_real.py,
-column batch_multi_queue): frees about two thirds of the observed waste
-without ever terminating a running allocation; the residual idle is
-single-GPU session parking, which a one-interactive-GPU-per-member rule
-(P1 read strictly) would bound.
+a wall-clock cap. In addition, a member may hold at most ONE interactive
+session at a time (P1 read strictly); opening a new session supersedes
+the old one (swap at start, no forced termination by the system of
+anyone else's work). Replayed on the real month (tools/replay_real.py,
+column batch_multi_queue): wait p95 from 557 to 0 minutes, 99.5% of
+requests satisfied, P1 met, idle holding bounded to one parked session
+per member; the only terminated allocations are the owner's own
+superseded sessions.
 
 ## Consequences for the policy roadmap
 

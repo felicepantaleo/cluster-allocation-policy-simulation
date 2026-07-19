@@ -73,6 +73,7 @@ class Engine:
         self.resubmit_patience_s = resubmit_patience_s
 
         self.pending: dict[str, Request] = {}
+        self._scanning = False
         self.requests_by_id: dict[str, Request] = {r.request_id: r for r in requests}
         self.group_started: set[str] = set()
         self.records: list[dict] = []
@@ -140,9 +141,12 @@ class Engine:
         self._try_schedule()
 
     def reclaim(self, alloc: Allocation, reclaim_offset: float,
-                reason: str = "reclaimed") -> None:
-        """Called by a policy timer (idle reclaim or a multi-GPU time cap).
-        reclaim_offset is seconds into the allocation at which it fires."""
+                reason: str = "reclaimed", resubmit: bool = True) -> None:
+        """Called by a policy timer (idle reclaim, a multi-GPU time cap) or
+        an interactive-session swap. reclaim_offset is seconds into the
+        allocation at which it fires; resubmit=False suppresses the user
+        resubmission model (e.g. a superseded session was abandoned by its
+        own owner)."""
         if alloc.actual_end is not None:
             return
         now = self.loop.now
@@ -151,6 +155,9 @@ class Engine:
         self.last_release_wp = alloc.request.wp
         self.policy.on_end(alloc, self)
         req = alloc.request
+        if not resubmit:
+            self._try_schedule()
+            return
         rest = remaining_profile(req, reclaim_offset)
         # a user who resubmits after a reap comes back to work: drop the
         # leading idle (it was the reason for the reap, not future behavior)
@@ -189,6 +196,15 @@ class Engine:
     # ------------------------------------------------------------ scheduling
 
     def _try_schedule(self) -> None:
+        if self._scanning:  # re-entrant call from a swap inside the scan
+            return
+        self._scanning = True
+        try:
+            self._scan()
+        finally:
+            self._scanning = False
+
+    def _scan(self) -> None:
         now = self.loop.now
         for req in self.policy.order_pending(list(self.pending.values()), self):
             if req.request_id not in self.pending:

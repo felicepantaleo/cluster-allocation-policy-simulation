@@ -42,6 +42,13 @@ class WpFairShare(Policy):
         self.cap_s = params.get("multi_gpu_cap_h", 24.0) * H
         self.window_s = params.get("usage_window_h", 72.0) * H
         self.fair_tol = params.get("fair_tolerance", 0.05)
+        # strict P1: how many concurrent interactive (single-GPU) sessions
+        # one member may hold; None = unlimited. With swap (default), a new
+        # session SUPERSEDES the member's oldest running one at start time
+        # (opening a new session closes the old); without swap the new
+        # session waits until the old one ends.
+        self.max_interactive = params.get("max_interactive_per_user")
+        self.interactive_swap = params.get("interactive_swap", True)
         # usage ledger: one entry per allocation, pruned once outside window
         self._ledger: list[dict] = []
         self._running_singles: dict[str, int] = {}
@@ -91,6 +98,22 @@ class WpFairShare(Policy):
         return sorted(pending, key=key)
 
     def eligible(self, req: Request, engine: "Engine") -> bool:
+        # strict P1: one interactive session per member at a time
+        if (self.max_interactive is not None and req.gpus == 1
+                and self._running_singles.get(req.user, 0)
+                >= self.max_interactive):
+            if not self.interactive_swap:
+                return False
+            # the new session supersedes the member's oldest running one
+            now = engine.loop.now
+            mine = [a for a in engine.cluster.allocations.values()
+                    if a.actual_end is None and a.request.gpus == 1
+                    and a.request.user == req.user]
+            for a in sorted(mine, key=lambda a: a.start):
+                engine.reclaim(a, reclaim_offset=now - a.start,
+                               reason="superseded", resubmit=False)
+                if self._running_singles.get(req.user, 0) < self.max_interactive:
+                    break
         # P1 reservation: non-guaranteed requests must leave `reserve` GPUs
         # free in the pool; guaranteed singles may dip into the headroom
         res = self.reserve.get(req.pool, 0)

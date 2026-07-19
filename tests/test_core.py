@@ -278,3 +278,30 @@ def test_scenario_parsing():
     assert sum(d for d, _ in g0.profile) == pytest.approx(24 * H)
     assert reqs[2].wp == "WP1"
     assert sum(d for d, _ in reqs[2].profile) == pytest.approx(4 * H, rel=1e-6)
+
+
+def test_one_interactive_session_swap():
+    params = {"wp_targets": {"WP1": 1.0}, "max_interactive_per_user": 1}
+    rs = [wp_req("a", "WP1", 1, t=0, dur=2 * H, user="uu"),
+          wp_req("b", "WP1", 1, t=60, dur=1 * H, user="uu"),
+          wp_req("c", "WP1", 1, t=120, dur=1 * H, user="other")]
+    eng = run(small_cluster(), rs, policy="ngt_principles", params=params)
+    o = outcomes(eng)
+    assert o["a"]["wait_s"] == 0.0
+    assert o["b"]["wait_s"] == 0.0  # swap: new session starts immediately
+    assert o["c"]["wait_s"] == 0.0  # other users unaffected
+    allocs = {x["request_id"]: x for x in eng.records
+              if x.get("record") == "allocation"}
+    assert allocs["a"]["end_reason"] == "superseded"
+    assert allocs["a"]["end"] == pytest.approx(60.0)
+    assert not any(r.get("resubmit_of") == "a" for r in o.values())
+
+
+def test_one_interactive_session_serialize():
+    params = {"wp_targets": {"WP1": 1.0}, "max_interactive_per_user": 1,
+              "interactive_swap": False}
+    rs = [wp_req("a", "WP1", 1, t=0, dur=2 * H, user="uu"),
+          wp_req("b", "WP1", 1, t=60, dur=1 * H, user="uu")]
+    eng = run(small_cluster(), rs, policy="ngt_principles", params=params)
+    o = outcomes(eng)
+    assert o["b"]["wait_s"] == pytest.approx(2 * H - 60)
