@@ -87,6 +87,20 @@ shorter the allocation cap, the more frequent the submission windows).
   quota adherence per epoch; and the same global wait, utilization and
   share metrics as every policy, A/B against baseline.
 
+## Preferred realization under discussion (2026-07-19)
+
+Rather than reclaiming idle resources, remove the possibility of
+interactive multi-GPU allocations altogether: multi-GPU work is submitted
+as a batch job, executes, and exits at completion, behind a queue that
+accounts for the priorities of all jobs (guaranteed 1-GPU tier first, then
+working-package fair share). Interactive sessions remain single-GPU only.
+Under this variant P3's time limit is realized by exit-at-end rather than
+a wall-clock cap. Replayed on the real month (tools/replay_real.py,
+column batch_multi_queue): frees about two thirds of the observed waste
+without ever terminating a running allocation; the residual idle is
+single-GPU session parking, which a one-interactive-GPU-per-member rule
+(P1 read strictly) would bound.
+
 ## Consequences for the policy roadmap
 
 The candidate that implements these principles is a WP-quota fair-share

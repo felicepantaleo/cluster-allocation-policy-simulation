@@ -63,7 +63,35 @@ POLICIES = {
                        "multi_gpu_cap_h": 24,
                        "tiers": [{"max_h": 8, "decisions_per_day": 3},
                                  {"max_h": 100000, "decisions_per_day": 1}]},
+    # PMC variant (Felice): no reclaim; multi-GPU jobs are batch-only
+    # (submitted, executed, exit at completion: the profile collapses to
+    # its active envelope, workless parks are never submitted) behind a
+    # priority queue (guaranteed 1-GPU tier first, then WP fair share).
+    # Single-GPU interactive sessions stay exactly as observed.
+    "batch_multi_queue": {"_policy": "ngt_principles", "_batch": True,
+                          "reserve": {"h100nvl": 4, "l40s": 1},
+                          "multi_gpu_cap_h": 1e6},
 }
+
+
+def batchify(requests: list[Request]) -> tuple[list[Request], int, float]:
+    """Multi-GPU requests become batch jobs: active segments only, exit at
+    end. Multi-GPU holds with under 10 min of real work would never be
+    submitted as batch jobs and are dropped (prevented parking)."""
+    import dataclasses
+    out, prevented, freed_h = [], 0, 0.0
+    for r in requests:
+        if r.gpus <= 1:
+            out.append(r)
+            continue
+        active = [(d, u) for d, u in r.profile if u >= 0.05]
+        dur = sum(d for d, _ in active)
+        freed_h += (r.duration_s - dur) * r.gpus / H
+        if dur < 600.0:
+            prevented += 1
+            continue
+        out.append(dataclasses.replace(r, duration_s=dur, profile=active))
+    return out, prevented, freed_h
 TIERS = POLICIES["planning_cycle"]["tiers"]
 
 
@@ -201,13 +229,22 @@ def main() -> None:
 
     horizon = END - T0
     metrics_by, cards = {}, {}
+    batch_note = ""
     for pname, params in POLICIES.items():
         params = dict(params)
+        engine_policy = params.pop("_policy", pname)
+        run_reqs = requests
+        if params.pop("_batch", False):
+            run_reqs, prevented, freed_h = batchify(requests)
+            batch_note = (f"batch_multi_queue: {prevented} workless "
+                          f"multi-GPU parks never submitted; "
+                          f"{freed_h:.0f} held GPU-h shed by exit-at-end")
+            print(batch_note)
         params.setdefault("wp_targets", WP_TARGETS)
         params.setdefault("charge_factors", CHARGE)
         engine = Engine(
-            cluster=Cluster(pools), policy=make_policy(pname, params),
-            requests=requests, cordons=list(cordons), horizon_s=horizon,
+            cluster=Cluster(pools), policy=make_policy(engine_policy, params),
+            requests=run_reqs, cordons=list(cordons), horizon_s=horizon,
             seed=42, snapshot_interval_s=1800.0,
             resubmit_reaction_median_s=600.0, resubmit_reaction_sigma=0.8,
             resubmit_patience_s=6 * H)
@@ -251,7 +288,8 @@ def main() -> None:
     report = ["# Real-trace replay: 30 measured days through the policy set",
               "",
               "Trace: data/derived (MONIT extraction), conversion rules in "
-              "tools/replay_real.py. " + fidelity, "",
+              "tools/replay_real.py. " + fidelity,
+              "", batch_note, "",
               comparison_table(metrics_by, GPU_POOLS), "",
               principles.render_md(cards), ""]
     (out / "comparison.md").write_text("\n".join(report))
