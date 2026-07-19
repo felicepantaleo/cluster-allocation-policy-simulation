@@ -10,7 +10,7 @@ July 2026</p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="2" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="2" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="method-in-one-slide">Method in one slide</h1>
+<h1 id="method">Method</h1>
 <div class="three">
 <div class="card short">
 <h3 id="data">Data</h3>
@@ -36,39 +36,39 @@ Idle = GPU utilization below 5%.</p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="3" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:58%;" data-marpit-pagination-total="19" data-marpit-advanced-background="background" data-marpit-advanced-background-split="right"><div data-marpit-advanced-background-container="true" data-marpit-advanced-background-direction="horizontal"><figure style="background-image:url(&quot;plots/01_occupancy_ceiling.png&quot;);background-size:contain;"></figure></div></section></foreignObject><foreignObject width="42%" height="720"><section id="3" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="3" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:58%;" data-marpit-pagination-total="19" data-marpit-advanced-background="content" data-marpit-advanced-background-split="right">
 <header>NGT resource allocation</header>
-<h1 id="allocation-is-static-pools-sit-full-for-weeks">Allocation is static: pools sit full for weeks</h1>
+<h1 id="static-allocation">Static allocation</h1>
 
 <ul>
 <li>All pools at their effective ceiling around the clock</li>
-<li>No diurnal breathing: allocation tracks ownership, not work</li>
+<li>No diurnal variation: allocation follows ownership, not workload</li>
 <li>Only the forced maintenance evictions of 6 to 8 July freed capacity</li>
 </ul>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="3" style="" data-marpit-pagination-total="19" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="4" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="4" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="when-the-pool-is-full-waits-reach-hours">When the pool is full, waits reach hours</h1>
+<h1 id="waiting-times">Waiting times</h1>
 <p><img src="plots/02_waits.png" alt="" style="height:470px;" /></p>
-<p>Most requests are instant; the tail waits up to 15.5 h (H100 NVL p95).</p>
+<p>75 to 90% of requests are satisfied immediately; the H100 NVL p95 wait is 15.5 h.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="5" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="5" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="a-queue-exists-in-all-but-name">A queue exists in all but name</h1>
+<h1 id="the-pending-queue">The Pending queue</h1>
 <p><img src="plots/03_pending_backlog.png" alt="" style="height:470px;" /></p>
-<p>Up to 32 requests wait as Pending pods, racing for freed GPUs.</p>
+<p>Peak backlog: 32 simultaneous Pending requests, stacked by target pool.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="6" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="6" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="who-pays-131-lockouts-in-a-month">Who pays: 131 lockouts in a month</h1>
+<h1 id="lockouts">Lockouts</h1>
 <p><img src="plots/14_lockout_waits.png" alt="" style="height:420px;" /></p>
 <p>Over half of all queue pressure is top-up demand from users already running.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="7" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:56%;" data-marpit-pagination-total="19" data-marpit-advanced-background="background" data-marpit-advanced-background-split="right"><div data-marpit-advanced-background-container="true" data-marpit-advanced-background-direction="horizontal"><figure style="background-image:url(&quot;plots/04_idle_gpu_hours.png&quot;);background-size:contain;"></figure></div></section></foreignObject><foreignObject width="44%" height="720"><section id="7" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="7" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:56%;" data-marpit-pagination-total="19" data-marpit-advanced-background="content" data-marpit-advanced-background-split="right">
 <header>NGT resource allocation</header>
-<h1 id="the-cause-71-of-held-gpu-hours-are-idle">The cause: 71% of held GPU-hours are idle</h1>
+<h1 id="idle-held-gpu-hours">Idle held GPU-hours</h1>
 
 <ul>
 <li>53 000 GPU-hours parked in 30 days</li>
@@ -80,14 +80,14 @@ Idle = GPU utilization below 5%.</p>
 </section>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="7" style="" data-marpit-pagination-total="19" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="8" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="8" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="every-pool-wastes-most-of-its-held-hours">Every pool wastes most of its held hours</h1>
+<h1 id="idle-share-by-pool">Idle share by pool</h1>
 <p><img src="plots/13_pool_idle_active.png" alt="" style="height:440px;" /></p>
-<p>L40S, the designated overflow pool, is 91% idle: a parking lot.</p>
+<p>The L40S pool is idle for 91% of its DCGM-covered held hours.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="9" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:54%;" data-marpit-pagination-total="19" data-marpit-advanced-background="background" data-marpit-advanced-background-split="right"><div data-marpit-advanced-background-container="true" data-marpit-advanced-background-direction="horizontal"><figure style="background-image:url(&quot;plots/10_user_greediness.png&quot;);background-size:contain;"></figure></div></section></foreignObject><foreignObject width="46%" height="720"><section id="9" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="9" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:54%;" data-marpit-pagination-total="19" data-marpit-advanced-background="content" data-marpit-advanced-background-split="right">
 <header>NGT resource allocation</header>
-<h1 id="idleness-not-usage-ranks-the-heavy-holders">Idleness, not usage, ranks the heavy holders</h1>
+<h1 id="heavy-idle-holders">Heavy idle holders</h1>
 
 <ul>
 <li>Solid = held idle, pale = active</li>
@@ -95,35 +95,35 @@ Idle = GPU utilization below 5%.</p>
 P1 allowance</li>
 <li><strong>20 users</strong> exceed it</li>
 <li><strong>26 700 GPU-hours</strong> sit above it</li>
-<li>Greedy and productive are different people: the top consumer is almost<br />
-all active</li>
+<li>The consumption and idleness rankings select different users: the top<br />
+consumer is almost entirely active</li>
 </ul>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="9" style="" data-marpit-pagination-total="19" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="10" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:54%;" data-marpit-pagination-total="19" data-marpit-advanced-background="background" data-marpit-advanced-background-split="right"><div data-marpit-advanced-background-container="true" data-marpit-advanced-background-direction="horizontal"><figure style="background-image:url(&quot;plots/15_user_greediness_by_pool.png&quot;);background-size:contain;"></figure></div></section></foreignObject><foreignObject width="46%" height="720"><section id="10" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="10" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:54%;" data-marpit-pagination-total="19" data-marpit-advanced-background="content" data-marpit-advanced-background-split="right">
 <header>NGT resource allocation</header>
-<h1 id="where-the-greediness-lives-per-pool">Where the greediness lives, per pool</h1>
+<h1 id="idle-holders-by-pool">Idle holders by pool</h1>
 
 <ul>
 <li>NVL: broad behavior, top 12 hold 66% of idle</li>
 <li>SXM: three users own the idle hours</li>
 <li>L40S: 12 users own 98% of the idle hours</li>
-<li>Automated reclaim fits NVL; L40S and SXM could be recovered with a<br />
-handful of emails</li>
+<li>The one-session rule and batch-only multi-GPU bound all of this by<br />
+construction</li>
 </ul>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="10" style="" data-marpit-pagination-total="19" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="11" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="11" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="what-this-would-cost-on-a-public-cloud">What this would cost on a public cloud</h1>
+<h1 id="cloud-equivalent-cost">Cloud-equivalent cost</h1>
 <p><img src="plots/16_cloud_cost_chf.png" alt="" style="height:440px;" /></p>
-<p>480 kCHF/month rental equivalent, at least 267 kCHF of it idle:<br />
-a <strong>3.2 MCHF/year</strong> burn rate on parked silicon.</p>
+<p>Rental equivalent: 480 kCHF/month, of which at least 267 kCHF idle<br />
+(3.2 MCHF/year). On-demand rates, July 2026; egress and storage excluded.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="12" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="12" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="who-gets-the-gpu-hours-today">Who gets the GPU-hours today</h1>
+<h1 id="gpu-hours-by-wp">GPU-hours by WP</h1>
 <p><img src="plots/06_wp_shares.png" alt="" style="height:440px;" /></p>
 <p>WP2 is on its 30% target organically; WP3 runs at 47% (CMS production<br />
 and CI included); WP1 at 22%; WP4 consumes nothing yet.</p>
@@ -131,43 +131,50 @@ and CI included); WP1 at 22%; WP4 consumes nothing yet.</p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="13" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="13" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="what-a-policy-changes-the-real-month-replayed">What a policy changes: the real month, replayed</h1>
-<p>Same 30 days, same requests, replayed through candidate schedulers:</p>
+<h1 id="the-real-month-replayed">The real month, replayed</h1>
+<p>Same 30 days, same requests, replayed through the proposed policy:</p>
 <table>
 <thead>
 <tr>
 <th></th>
 <th>today (FCFS)</th>
-<th>principles + idle reclaim</th>
+<th>proposed</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>wait p95</td>
 <td>557 min</td>
-<td><strong>4 min</strong></td>
+<td><strong>0 min</strong></td>
 </tr>
 <tr>
 <td>requests satisfied</td>
-<td>1393 / 1441</td>
-<td><strong>1430 / 1441</strong></td>
+<td>96.7%</td>
+<td><strong>99.4%</strong></td>
 </tr>
 <tr>
 <td>dev sessions within 15 min</td>
-<td>89%</td>
-<td><strong>96%</strong></td>
+<td>91%</td>
+<td><strong>98%</strong></td>
 </tr>
 <tr>
-<td>multi-GPU holds over 24 h</td>
-<td>96</td>
-<td><strong>0</strong></td>
+<td>NVL idle-held GPU-hours</td>
+<td>35 800</td>
+<td><strong>13 600</strong></td>
+</tr>
+<tr>
+<td>running work terminated by the system</td>
+<td>none</td>
+<td><strong>none</strong></td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p>Reclaim allocations idle longer than 30 min; guarantee one interactive<br />
-GPU per member; cap multi-GPU holds at 24 h; enforce WP shares on live<br />
-demand.</p>
+<p>Policy: one interactive session per member (a new session supersedes<br />
+the previous one); multi-GPU beyond a 96 GPU-h/month interactive<br />
+allowance runs as batch behind a WP fair-share priority queue.<br />
+Fixed-behavior replay, identical requests for every policy; the FCFS<br />
+baseline reproduces observed waits (median exact, p95 within factor 2).</p>
 </blockquote>
 <footer>NGT PMC, July 2026</footer>
 </section>
@@ -176,23 +183,25 @@ demand.</p>
 <h1 id="proposal-to-the-pmc">Proposal to the PMC</h1>
 <div class="three">
 <div class="card short">
-<h3 id="reclaim-idle-holds">Reclaim idle holds</h3>
-<p>Reap GPU allocations idle for more than 30 min. Attacks 71% of the waste<br />
-without touching active work.</p>
+<h3 id="one-interactive-session">One interactive session</h3>
+<p>One single-GPU session per member, guaranteed and always available;<br />
+opening a new one replaces the old.</p>
 </div>
 <div class="card short">
-<h3 id="guarantee-the-dev-gpu">Guarantee the dev GPU</h3>
-<p>One interactive GPU per member, always. Delivered in minutes in the<br />
-replay; MIG carve spread over two nodes.</p>
+<h3 id="multi-gpu-is-batch">Multi-GPU is batch</h3>
+<p>Submitted, executed, exits at completion, behind a priority queue with<br />
+WP fair share. A 96 GPU-h/month interactive allowance covers debugging.</p>
 </div>
 <div class="card short">
-<h3 id="cap-and-account">Cap and account</h3>
-<p>24 h cap on multi-GPU holds, GPU time charged to working packages with<br />
-model correction factors.</p>
+<h3 id="account-and-adjust">Account and adjust</h3>
+<p>GPU time charged to WPs with model factors. All parameters simulated<br />
+and tunable on the real trace.</p>
 </div>
 </div>
-<p>All parameters simulated and tunable; policy simulator, data extraction<br />
-and this evidence base are reproducible end to end.</p>
+<blockquote>
+<p>Implementable with Kueue plus one admission webhook and a small<br />
+accounting controller. The scheduler terminates no running work.</p>
+</blockquote>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="15" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-class="lead" data-theme="cern-ngt" lang="en-GB" class="lead" data-marpit-pagination="15" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--class:lead;--theme:cern-ngt;" data-marpit-pagination-total="19">
@@ -209,13 +218,13 @@ and this evidence base are reproducible end to end.</p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="17" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="17" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="backup-hold-durations-vs-the-24-h-cap">Backup: hold durations vs the 24 h cap</h1>
+<h1 id="backup-hold-durations">Backup: hold durations</h1>
 <p><img src="plots/08_hold_durations.png" alt="" style="height:470px;" /></p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="18" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:54%;" data-marpit-pagination-total="19" data-marpit-advanced-background="background" data-marpit-advanced-background-split="right"><div data-marpit-advanced-background-container="true" data-marpit-advanced-background-direction="horizontal"><figure style="background-image:url(&quot;plots/17_user_total_by_pool.png&quot;);background-size:contain;"></figure></div></section></foreignObject><foreignObject width="46%" height="720"><section id="18" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="18" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:54%;" data-marpit-pagination-total="19" data-marpit-advanced-background="content" data-marpit-advanced-background-split="right">
 <header>NGT resource allocation</header>
-<h1 id="backup-top-consumers-per-pool-in-kchf">Backup: top consumers per pool, in kCHF</h1>
+<h1 id="backup-top-consumers-per-pool">Backup: top consumers per pool</h1>
 
 <ul>
 <li>Secondary axis: cloud-equivalent kCHF, cheapest of AWS/GCP, July 2026</li>
@@ -226,7 +235,7 @@ and this evidence base are reproducible end to end.</p>
 </section>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="18" style="" data-marpit-pagination-total="19" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="19" data-paginate="true" data-header="NGT resource allocation" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="19" style="--paginate:true;--header:NGT resource allocation;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="19">
 <header>NGT resource allocation</header>
-<h1 id="backup-pool-usage-by-wp-cordons-idle-fractions">Backup: pool usage by WP, cordons, idle fractions</h1>
+<h1 id="backup-pools-and-cordons">Backup: pools and cordons</h1>
 <div class="columns">
 <div>
 <p><img src="plots/12_pool_usage_by_wp.png" alt="" style="height:330px;" /></p>

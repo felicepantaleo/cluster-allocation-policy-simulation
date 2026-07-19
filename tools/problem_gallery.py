@@ -58,8 +58,12 @@ def chf_axis(ax, pool, axis="y"):
     r = RATE_CHF[pool] / 1000.0
     fwd, inv = (lambda v: v * r), (lambda v: v / r)
     if axis == "y":
+        # the CMS style draws primary ticks on all four sides; silence the
+        # primary on the side the secondary occupies so scales do not overlap
+        ax.tick_params(axis="y", which="both", right=False, labelright=False)
         sec = ax.secondary_yaxis("right", functions=(fwd, inv))
     else:
+        ax.tick_params(axis="x", which="both", top=False, labeltop=False)
         sec = ax.secondary_xaxis("top", functions=(fwd, inv))
     sec.tick_params(labelsize=9, colors="#555555")
     return sec

@@ -3,3 +3,5 @@ __pycache__/
 results/
 *.pyc
 data/
+slides/node_modules/
+slides/package*.json

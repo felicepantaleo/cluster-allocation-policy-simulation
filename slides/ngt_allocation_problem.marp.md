@@ -24,7 +24,7 @@ Nothing on the problem slides is simulated.
 
 ---
 
-# Method in one slide
+# Method
 
 <div class="three">
 
@@ -62,33 +62,33 @@ manual classification: 99.4% of GPU-hours attributed.
 
 ---
 
-# Allocation is static: pools sit full for weeks
+# Static allocation
 
 ![bg right:58% fit](plots/01_occupancy_ceiling.png)
 
 - All pools at their effective ceiling around the clock
-- No diurnal breathing: allocation tracks ownership, not work
+- No diurnal variation: allocation follows ownership, not workload
 - Only the forced maintenance evictions of 6 to 8 July freed capacity
 
 ---
 
-# When the pool is full, waits reach hours
+# Waiting times
 
 ![h:470](plots/02_waits.png)
 
-Most requests are instant; the tail waits up to 15.5 h (H100 NVL p95).
+75 to 90% of requests are satisfied immediately; the H100 NVL p95 wait is 15.5 h.
 
 ---
 
-# A queue exists in all but name
+# The Pending queue
 
 ![h:470](plots/03_pending_backlog.png)
 
-Up to 32 requests wait as Pending pods, racing for freed GPUs.
+Peak backlog: 32 simultaneous Pending requests, stacked by target pool.
 
 ---
 
-# Who pays: 131 lockouts in a month
+# Lockouts
 
 ![h:420](plots/14_lockout_waits.png)
 
@@ -96,7 +96,7 @@ Over half of all queue pressure is top-up demand from users already running.
 
 ---
 
-# The cause: 71% of held GPU-hours are idle
+# Idle held GPU-hours
 
 ![bg right:56% fit](plots/04_idle_gpu_hours.png)
 
@@ -107,15 +107,15 @@ Over half of all queue pressure is top-up demand from users already running.
 
 ---
 
-# Every pool wastes most of its held hours
+# Idle share by pool
 
 ![h:440](plots/13_pool_idle_active.png)
 
-L40S, the designated overflow pool, is 91% idle: a parking lot.
+The L40S pool is idle for 91% of its DCGM-covered held hours.
 
 ---
 
-# Idleness, not usage, ranks the heavy holders
+# Heavy idle holders
 
 ![bg right:54% fit](plots/10_user_greediness.png)
 
@@ -124,33 +124,33 @@ L40S, the designated overflow pool, is 91% idle: a parking lot.
   P1 allowance
 - **20 users** exceed it
 - **26 700 GPU-hours** sit above it
-- Greedy and productive are different people: the top consumer is almost
-  all active
+- The consumption and idleness rankings select different users: the top
+  consumer is almost entirely active
 
 ---
 
-# Where the greediness lives, per pool
+# Idle holders by pool
 
 ![bg right:54% fit](plots/15_user_greediness_by_pool.png)
 
 - NVL: broad behavior, top 12 hold 66% of idle
 - SXM: three users own the idle hours
 - L40S: 12 users own 98% of the idle hours
-- Automated reclaim fits NVL; L40S and SXM could be recovered with a
-  handful of emails
+- The one-session rule and batch-only multi-GPU bound all of this by
+  construction
 
 ---
 
-# What this would cost on a public cloud
+# Cloud-equivalent cost
 
 ![h:440](plots/16_cloud_cost_chf.png)
 
-480 kCHF/month rental equivalent, at least 267 kCHF of it idle:
-a **3.2 MCHF/year** burn rate on parked silicon.
+Rental equivalent: 480 kCHF/month, of which at least 267 kCHF idle
+(3.2 MCHF/year). On-demand rates, July 2026; egress and storage excluded.
 
 ---
 
-# Who gets the GPU-hours today
+# GPU-hours by WP
 
 ![h:440](plots/06_wp_shares.png)
 
@@ -159,20 +159,23 @@ and CI included); WP1 at 22%; WP4 consumes nothing yet.
 
 ---
 
-# What a policy changes: the real month, replayed
+# The real month, replayed
 
-Same 30 days, same requests, replayed through candidate schedulers:
+Same 30 days, same requests, replayed through the proposed policy:
 
-| | today (FCFS) | principles + idle reclaim |
+| | today (FCFS) | proposed |
 |---|---|---|
-| wait p95 | 557 min | **4 min** |
-| requests satisfied | 1393 / 1441 | **1430 / 1441** |
-| dev sessions within 15 min | 89% | **96%** |
-| multi-GPU holds over 24 h | 96 | **0** |
+| wait p95 | 557 min | **0 min** |
+| requests satisfied | 96.7% | **99.4%** |
+| dev sessions within 15 min | 91% | **98%** |
+| NVL idle-held GPU-hours | 35 800 | **13 600** |
+| running work terminated by the system | none | **none** |
 
-> Reclaim allocations idle longer than 30 min; guarantee one interactive
-> GPU per member; cap multi-GPU holds at 24 h; enforce WP shares on live
-> demand.
+> Policy: one interactive session per member (a new session supersedes
+> the previous one); multi-GPU beyond a 96 GPU-h/month interactive
+> allowance runs as batch behind a WP fair-share priority queue.
+> Fixed-behavior replay, identical requests for every policy; the FCFS
+> baseline reproduces observed waits (median exact, p95 within factor 2).
 
 ---
 
@@ -180,37 +183,37 @@ Same 30 days, same requests, replayed through candidate schedulers:
 
 <div class="three">
 
-<div class="card short">
+<div class="card compact">
 
-### Reclaim idle holds
+### One interactive session
 
-Reap GPU allocations idle for more than 30 min. Attacks 71% of the waste
-without touching active work.
-
-</div>
-
-<div class="card short">
-
-### Guarantee the dev GPU
-
-One interactive GPU per member, always. Delivered in minutes in the
-replay; MIG carve spread over two nodes.
+One single-GPU session per member, guaranteed and always available;
+opening a new one replaces the old.
 
 </div>
 
-<div class="card short">
+<div class="card compact">
 
-### Cap and account
+### Multi-GPU is batch
 
-24 h cap on multi-GPU holds, GPU time charged to working packages with
-model correction factors.
+Submitted, executed, exits at completion, behind a priority queue with
+WP fair share. A 96 GPU-h/month interactive allowance covers debugging.
+
+</div>
+
+<div class="card compact">
+
+### Account and adjust
+
+GPU time charged to WPs with model factors. All parameters simulated
+and tunable on the real trace.
 
 </div>
 
 </div>
 
-All parameters simulated and tunable; policy simulator, data extraction
-and this evidence base are reproducible end to end.
+> Implementable with Kueue plus one admission webhook and a small
+> accounting controller. The scheduler terminates no running work.
 
 ---
 
@@ -226,13 +229,13 @@ and this evidence base are reproducible end to end.
 
 ---
 
-# Backup: hold durations vs the 24 h cap
+# Backup: hold durations
 
 ![h:470](plots/08_hold_durations.png)
 
 ---
 
-# Backup: top consumers per pool, in kCHF
+# Backup: top consumers per pool
 
 ![bg right:54% fit](plots/17_user_total_by_pool.png)
 
@@ -242,7 +245,7 @@ and this evidence base are reproducible end to end.
 
 ---
 
-# Backup: pool usage by WP, cordons, idle fractions
+# Backup: pools and cordons
 
 <div class="columns">
 
