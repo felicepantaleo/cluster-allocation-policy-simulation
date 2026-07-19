@@ -1,4 +1,4 @@
-"""Principle-by-principle scorecard (PRINCIPLES.md P1 to P6).
+"""Principle-by-principle scorecard (PRINCIPLES.md P1 to P5).
 
 Scores one policy run against each principle with concrete, checkable
 numbers, and renders a comparison table across policies. Verdict
@@ -16,14 +16,12 @@ held ratio; that distinction is the point.
 
 from __future__ import annotations
 
-import math
 
 import numpy as np
 
 from .trace import Request
 
 H = 3600.0
-NOON = 12 * H
 
 
 def _percentile(vals, q):
@@ -34,7 +32,7 @@ def scorecard(records: list[dict], requests_by_id: dict[str, Request],
               gpu_pools: list[str], t0: float, t1: float,
               wp_targets: dict | None, charge_factors: dict | None,
               p1_target_min: float = 15.0, cap_h: float = 24.0,
-              planning_tiers: list | None = None) -> dict:
+              planning_tiers: list | None = None) -> dict:  # tiers ignored
     gpu_pools = set(gpu_pools)
     req_recs = [r for r in records if r.get("record") != "allocation"]
     alloc_recs = [r for r in records if r.get("record") == "allocation"]
@@ -214,44 +212,9 @@ def scorecard(records: list[dict], requests_by_id: dict[str, Request],
           "unattributed_gpu_h": round(unattributed, 1),
           "verdict": "met" if unattributed == 0 else "missed"}
 
-    # ---------------- P6: declaration epochs (planning policies only)
-    p6 = {"verdict": "not implemented by this policy"}
-    if planning_tiers:
-        tiers = sorted(planning_tiers, key=lambda t: t["max_h"])
-
-        def epoch_for(req: Request) -> float:
-            period = 86400.0 / tiers[-1]["decisions_per_day"]
-            for t in tiers:
-                if req.duration_s <= t["max_h"] * H:
-                    period = 86400.0 / t["decisions_per_day"]
-                    break
-            return NOON + math.ceil((req.submit_time - NOON) / period) * period
-
-        from_epoch, at_first = [], 0
-        declared = 0
-        for gid, recs in groups.items():
-            r0 = recs[0]
-            if r0["gpus"] <= 1 or r0["pool"] not in gpu_pools:
-                continue
-            declared += 1
-            w = first_start(recs)
-            if w is None:
-                continue
-            req = requests_by_id[r0["request_id"]]
-            delay = (r0["submit_time"] + w) - epoch_for(req)
-            from_epoch.append(max(delay, 0.0) / 60)
-            if delay <= 1800 + 60:
-                at_first += 1
-        p6 = {"declared_jobs": declared,
-              "granted_at_first_epoch_frac": at_first / declared if declared else None,
-              "p95_wait_from_epoch_min": _percentile(from_epoch, 95),
-              "verdict": ("met" if declared and at_first / declared >= 0.9 else
-                          "partial" if declared and at_first / declared >= 0.6 else
-                          "missed")}
-
     return {"P1_interactive_guarantee": p1, "P2_wp_shares": p2,
             "P3_multi_gpu_cap": p3, "P4_intra_wp_recycling": p4,
-            "P5_production_attribution": p5, "P6_declaration_cycle": p6,
+            "P5_production_attribution": p5,
             "job_done_by_class": job_done}
 
 
@@ -290,8 +253,6 @@ def render_md(cards: dict[str, dict], p1_target_min: float = 15.0) -> str:
     row("P4 verdict", lambda c: c["P4_intra_wp_recycling"]["verdict"])
     row("P4 same-WP handoff fraction", lambda c: c["P4_intra_wp_recycling"]["same_wp_frac"], "{:.0%}")
     row("P5 verdict", lambda c: c["P5_production_attribution"]["verdict"])
-    row("P6 verdict", lambda c: c["P6_declaration_cycle"]["verdict"])
-    row("P6 granted at first epoch", lambda c: c["P6_declaration_cycle"].get("granted_at_first_epoch_frac"), "{:.0%}")
 
     kinds = sorted({k for c in cards.values() for k in c["job_done_by_class"]})
     for kind in kinds:

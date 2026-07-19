@@ -66,27 +66,6 @@ behalf of the WP, not the individual.
 - Metric: share accounting per P2 with production jobs attributed to WPs;
   per-user metrics exclude WP-attributed production jobs.
 
-## P6. Declared allocations and a tiered planning cycle
-
-Big allocations and job launches for the following 24 hours are declared
-before 12:00. At 12:00, given the priorities and the quotas, the order of
-the jobs and allocations is decided. Shorter jobs follow the same pattern at
-higher frequency: with a max allocation time of 8 hours they can be
-submitted at 3 decision points per day, and so on down the tiers (the
-shorter the allocation cap, the more frequent the submission windows).
-
-- Simulation: a planning-cycle policy that replaces continuous first-fit
-  with batch decisions at fixed epochs. Tiers are (max allocation duration,
-  decisions per day): (24 h, 1 at 12:00), (8 h, 3), and further tiers as
-  configured. At each epoch the batch is ordered by the principles above:
-  P1 guarantees first, then WP quota headroom (P2), then declaration order.
-  The P1 interactive single-GPU tier stays continuous and never waits for an
-  epoch.
-- Metric: wait measured from the declaration deadline (not from submission)
-  for declared jobs; fraction of declared jobs granted at their epoch;
-  quota adherence per epoch; and the same global wait, utilization and
-  share metrics as every policy, A/B against baseline.
-
 ## Preferred realization under discussion (2026-07-19)
 
 Rather than reclaiming idle resources, remove the possibility of

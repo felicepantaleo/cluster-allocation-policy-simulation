@@ -59,10 +59,6 @@ POLICIES = {
     "ngt_principles_reclaim": {"reserve": {"h100nvl": 4, "l40s": 1},
                                "multi_gpu_cap_h": 24,
                                "util_thresh": 0.05, "idle_after_s": 1800},
-    "planning_cycle": {"reserve": {"h100nvl": 4, "l40s": 1},
-                       "multi_gpu_cap_h": 24,
-                       "tiers": [{"max_h": 8, "decisions_per_day": 3},
-                                 {"max_h": 100000, "decisions_per_day": 1}]},
     # PMC variant (Felice): no reclaim; multi-GPU jobs are batch-only
     # (submitted, executed, exit at completion: the profile collapses to
     # its active envelope, workless parks are never submitted) behind a
@@ -131,7 +127,8 @@ def batchify(requests: list[Request]) -> tuple[list[Request], int, float]:
             continue
         out.append(dataclasses.replace(r, duration_s=dur, profile=active))
     return out, prevented, freed_h
-TIERS = POLICIES["planning_cycle"]["tiers"]
+TIERS = [{"max_h": 8, "decisions_per_day": 3},
+         {"max_h": 100000, "decisions_per_day": 1}]
 
 
 def classify(r) -> str:
