@@ -11,7 +11,7 @@ July 2026</p>
 <div class="three">
 <div class="card short">
 <h3 id="data">Data</h3>
-<p>Pod lifecycle, requests, placement, cordons and per-GPU utilization from<br />
+<p>Extracted pod lifecycle, requests, placement, cordons and per-GPU utilization from<br />
 cluster monitoring, 30 days at 5 min resolution.</p>
 </div>
 <div class="card short">
@@ -22,7 +22,7 @@ STEAM Academy accounts and cloud T4 nodes excluded.</p>
 <div class="card short">
 <h3 id="attribution">Attribution</h3>
 <p>Users mapped to WP1 to WP4 via the project roster, department rules and<br />
-manual classification: 99.4% of GPU-hours attributed.</p>
+manual classification: 99.4% of GPU-hours attributed. Some WP1 users might have been attributed to WP2-3.</p>
 </div>
 </div>
 <blockquote>
@@ -56,7 +56,8 @@ Idle = GPU utilization below 5%.</p>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="6" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="6" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="20">
 <h1 id="lockouts">Lockouts</h1>
 <p><img src="plots/14_lockout_waits.svg" alt="" style="height:400px;" /></p>
-<p>Over half of all queue pressure is top-up demand from users already running.</p>
+<p>131 times last month a user not having another pod running has been locked out.<br />
+Over half of all queue pressure is top-up demand from users already running.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="7" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:56%;" data-marpit-pagination-total="20" data-marpit-advanced-background="background" data-marpit-advanced-background-split="right"><div data-marpit-advanced-background-container="true" data-marpit-advanced-background-direction="horizontal"><figure style="background-image:url(&quot;plots/04_idle_gpu_hours.svg&quot;);background-size:contain;"></figure></div></section></foreignObject><foreignObject width="44%" height="720"><section id="7" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="7" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;--marpit-advanced-background-split:56%;" data-marpit-pagination-total="20" data-marpit-advanced-background="content" data-marpit-advanced-background-split="right">
@@ -73,7 +74,7 @@ Idle = GPU utilization below 5%.</p>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="7" style="" data-marpit-pagination-total="20" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="8" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="8" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="20">
 <h1 id="idle-share-by-pool">Idle share by pool</h1>
 <p><img src="plots/13_pool_idle_active.svg" alt="" style="height:410px;" /></p>
-<p>The L40S pool is idle for 91% of its DCGM-covered held hours.</p>
+<p>The L40S pool is idle for 91% of its held hours: mainly explained by spiky heterogeneous algorithms development, benchmarking, and fear of losing the pod/tmux session.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="9" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="9" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="20">
@@ -88,8 +89,7 @@ idle pods. Robust across 0.5 to 2 core thresholds.</p>
 
 <ul>
 <li>Solid = held idle, pale = active</li>
-<li>Dashed line: one dev GPU held 24/7 all month (720 GPU-h), the legitimate<br />
-P1 allowance</li>
+<li>Dashed line: one dev GPU holding 24/7 all month (720 GPU-h).</li>
 <li><strong>20 users</strong> exceed it</li>
 <li><strong>26 700 GPU-hours</strong> sit above it</li>
 <li>The consumption and idleness rankings select different users: the top<br />
@@ -101,8 +101,8 @@ consumer is almost entirely active</li>
 <h1 id="idle-holders-by-pool">Idle holders by pool</h1>
 
 <ul>
-<li>NVL: broad behavior, top 12 hold 66% of idle</li>
-<li>SXM: three users own the idle hours</li>
+<li>H100-NVL: broad behavior, top 12 hold 66% of idle</li>
+<li>H100-SXM: three users own the idle hours. Do they all need fast inter-GPU communication?</li>
 <li>L40S: 12 users own 98% of the idle hours</li>
 <li>The one-session rule and batch-only multi-GPU bound all of this by<br />
 construction</li>
@@ -119,8 +119,6 @@ construction</li>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="13" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="13" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="20">
 <h1 id="gpu-hours-by-wp">GPU-hours by WP</h1>
 <p><img src="plots/06_wp_shares.svg" alt="" style="height:410px;" /></p>
-<p>WP2 is on its 30% target organically; WP3 runs at 47% (CMS production<br />
-and CI included); WP1 at 22%; WP4 consumes nothing yet.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="14" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="14" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="20">
@@ -130,8 +128,8 @@ and CI included); WP1 at 22%; WP4 consumes nothing yet.</p>
 <thead>
 <tr>
 <th></th>
-<th>today (FCFS)</th>
-<th>proposed</th>
+<th>Today (FCFS)</th>
+<th>Proposed</th>
 </tr>
 </thead>
 <tbody>
@@ -182,7 +180,8 @@ opening a new one replaces the old.</p>
 <div class="card compact">
 <h3 id="multi-gpu-is-batch">Multi-GPU is batch</h3>
 <p>Submitted, executed, exits at completion, behind a priority queue with<br />
-WP fair share. A 96 GPU-h/month interactive allowance covers debugging.</p>
+WP fair share. A 96 GPU-h/month interactive allowance covers debugging.<br />
+Amount to be tuned.</p>
 </div>
 <div class="card compact">
 <h3 id="account-and-adjust">Account and adjust</h3>

@@ -31,7 +31,7 @@ Nothing on the problem slides is simulated.
 
 ### Data
 
-Pod lifecycle, requests, placement, cordons and per-GPU utilization from
+Extracted pod lifecycle, requests, placement, cordons and per-GPU utilization from
 cluster monitoring, 30 days at 5 min resolution.
 
 </div>
@@ -50,7 +50,7 @@ STEAM Academy accounts and cloud T4 nodes excluded.
 ### Attribution
 
 Users mapped to WP1 to WP4 via the project roster, department rules and
-manual classification: 99.4% of GPU-hours attributed.
+manual classification: 99.4% of GPU-hours attributed. Some WP1 users might have been attributed to WP2-3.
 
 </div>
 
@@ -91,7 +91,9 @@ Peak backlog: 32 simultaneous Pending requests, stacked by target pool.
 
 ![h:400](plots/14_lockout_waits.svg)
 
+131 times last month a user not having another pod running has been locked out. 
 Over half of all queue pressure is top-up demand from users already running.
+
 
 ---
 
@@ -110,7 +112,7 @@ Over half of all queue pressure is top-up demand from users already running.
 
 ![h:410](plots/13_pool_idle_active.svg)
 
-The L40S pool is idle for 91% of its DCGM-covered held hours.
+The L40S pool is idle for 91% of its held hours: mainly explained by spiky heterogeneous algorithms development, benchmarking, and fear of losing the pod/tmux session. 
 
 ---
 
@@ -128,8 +130,7 @@ idle pods. Robust across 0.5 to 2 core thresholds.
 ![bg right:54% fit](plots/10_user_greediness.svg)
 
 - Solid = held idle, pale = active
-- Dashed line: one dev GPU held 24/7 all month (720 GPU-h), the legitimate
-  P1 allowance
+- Dashed line: one dev GPU holding 24/7 all month (720 GPU-h).
 - **20 users** exceed it
 - **26 700 GPU-hours** sit above it
 - The consumption and idleness rankings select different users: the top
@@ -141,8 +142,8 @@ idle pods. Robust across 0.5 to 2 core thresholds.
 
 ![bg right:54% fit](plots/15_user_greediness_by_pool.svg)
 
-- NVL: broad behavior, top 12 hold 66% of idle
-- SXM: three users own the idle hours
+- H100-NVL: broad behavior, top 12 hold 66% of idle
+- H100-SXM: three users own the idle hours. Do they all need fast inter-GPU communication?
 - L40S: 12 users own 98% of the idle hours
 - The one-session rule and batch-only multi-GPU bound all of this by
   construction
@@ -162,16 +163,13 @@ Rental equivalent: 480 kCHF/month, of which at least 267 kCHF idle
 
 ![h:410](plots/06_wp_shares.svg)
 
-WP2 is on its 30% target organically; WP3 runs at 47% (CMS production
-and CI included); WP1 at 22%; WP4 consumes nothing yet.
-
 ---
 
 # The real month, replayed
 
 Same 30 days, same requests, replayed through the proposed policy:
 
-| | today (FCFS) | proposed |
+| | Today (FCFS) | Proposed |
 |---|---|---|
 | wait p95 | 557 min | **0 min** |
 | requests satisfied | 96.7% | **99.4%** |
@@ -205,7 +203,8 @@ opening a new one replaces the old.
 ### Multi-GPU is batch
 
 Submitted, executed, exits at completion, behind a priority queue with
-WP fair share. A 96 GPU-h/month interactive allowance covers debugging.
+WP fair share. A 96 GPU-h/month interactive allowance covers debugging. 
+Amount to be tuned.
 
 </div>
 
