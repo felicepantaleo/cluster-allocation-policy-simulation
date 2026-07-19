@@ -8,9 +8,9 @@ footer: NGT PMC, July 2026
 
 <!-- _class: lead -->
 
-# The NGT GPU allocation problem, measured
+# Analysis of NGT cluster usage and proposal
 
-## 30 days of cluster telemetry, and what a policy would change
+## 30 days of cluster telemetry, and a policy replayed on them
 
 Felice Pantaleo (CERN)
 July 2026
@@ -111,6 +111,15 @@ Over half of all queue pressure is top-up demand from users already running.
 ![h:410](plots/13_pool_idle_active.svg)
 
 The L40S pool is idle for 91% of its DCGM-covered held hours.
+
+---
+
+# GPU-idle vs pod-idle
+
+![h:400](plots/20_gpu_vs_pod_idle.svg)
+
+Only 20% of GPU-idle hours run real CPU work (>= 1 core); 80% are fully
+idle pods. Robust across 0.5 to 2 core thresholds.
 
 ---
 
