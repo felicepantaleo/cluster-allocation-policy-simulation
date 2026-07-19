@@ -72,7 +72,45 @@ POLICIES = {
                           "reserve": {"h100nvl": 4, "l40s": 1},
                           "multi_gpu_cap_h": 1e6,
                           "max_interactive_per_user": 1},
+    # as batch_multi_queue, but each member keeps a monthly budget of
+    # interactive multi-GPU GPU-hours (debugging allowance); multi-GPU
+    # requests that fit the remaining budget stay interactive, the rest
+    # are submitted as batch jobs
+    "multi_budget_queue": {"_policy": "ngt_principles",
+                           "_budget_gpu_h": 96.0,
+                           "reserve": {"h100nvl": 4, "l40s": 1},
+                           "multi_gpu_cap_h": 1e6,
+                           "max_interactive_per_user": 1},
 }
+
+
+def budgetify(requests: list[Request], budget_h: float):
+    """Per member: interactive multi-GPU holds are kept as observed while
+    they fit in a sliding 30-day budget of held GPU-hours; requests that
+    do not fit are batchified (active envelope, exit at end)."""
+    import dataclasses
+    ledger: dict[str, list] = defaultdict(list)  # user -> [(t, gpu_h)]
+    out, kept, converted, prevented = [], 0, 0, 0
+    for r in sorted(requests, key=lambda r: r.submit_time):
+        if r.gpus <= 1:
+            out.append(r)
+            continue
+        w0 = r.submit_time - 30 * 86400
+        used = sum(h for t, h in ledger[r.user] if t >= w0)
+        held_h = r.duration_s * r.gpus / H
+        if used + held_h <= budget_h:
+            ledger[r.user].append((r.submit_time, held_h))
+            out.append(r)
+            kept += 1
+            continue
+        active = [(d, u) for d, u in r.profile if u >= 0.05]
+        dur = sum(d for d, _ in active)
+        if dur < 600.0:
+            prevented += 1
+            continue
+        out.append(dataclasses.replace(r, duration_s=dur, profile=active))
+        converted += 1
+    return out, kept, converted, prevented
 
 
 def batchify(requests: list[Request]) -> tuple[list[Request], int, float]:
@@ -241,6 +279,15 @@ def main() -> None:
                           f"multi-GPU parks never submitted; "
                           f"{freed_h:.0f} held GPU-h shed by exit-at-end")
             print(batch_note)
+        budget = params.pop("_budget_gpu_h", None)
+        if budget is not None:
+            run_reqs, kept, converted, prevented = budgetify(requests, budget)
+            batch_note += (f"\n\nmulti_budget_queue ({budget:.0f} GPU-h/month "
+                           f"interactive multi-GPU per member): {kept} "
+                           f"multi-GPU holds stay interactive, {converted} "
+                           f"run as batch, {prevented} workless parks "
+                           "never submitted")
+            print(batch_note.splitlines()[-1])
         params.setdefault("wp_targets", WP_TARGETS)
         params.setdefault("charge_factors", CHARGE)
         engine = Engine(
