@@ -202,3 +202,8 @@ section blockquote { font-size: 24px; }
 section table { border-collapse: collapse; margin: 8px 0; }
 section th, section td { border-bottom: 1px solid var(--border); padding: 6px 20px 6px 0; }
 section thead th { border-bottom: 2px solid var(--cern-mid); }
+
+/* slides with a right-side background plot: logo and page number would
+   overlap the figure, hide both */
+section.plotright::before { content: none; }
+section.plotright::after { display: none; }

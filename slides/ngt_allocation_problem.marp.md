@@ -59,6 +59,8 @@ Users mapped to WP1 to WP3 via the project roster, group and manual classificati
 
 ---
 
+<!-- _class: plotright -->
+
 # Static allocation
 
 ![bg right:58% fit](plots/01_occupancy_ceiling.png)
@@ -85,6 +87,15 @@ Peak backlog: 32 simultaneous Pending requests, stacked by target pool.
 
 ---
 
+# Unsatisfied requests
+
+![h:410](plots/07_unsatisfied.svg)
+
+146 requests (9%) were never satisfied; their owners gave up after a
+median 72 minutes of waiting.
+
+---
+
 # Lockouts
 
 ![h:400](plots/14_lockout_waits.svg)
@@ -94,6 +105,8 @@ Over half of all queue pressure is top-up demand from users already running.
 
 
 ---
+
+<!-- _class: plotright -->
 
 # Idle held GPU-hours
 
@@ -123,6 +136,16 @@ idle pods. Robust across 0.5 to 2 core thresholds.
 
 ---
 
+# Hold durations
+
+![h:410](plots/08_hold_durations.svg)
+
+The p95 hold is 16.7 days; 68 multi-GPU holds exceed 24 hours.
+
+---
+
+<!-- _class: plotright -->
+
 # Heavy idle holders
 
 ![bg right:54% fit](plots/10_user_greediness.svg)
@@ -135,6 +158,8 @@ idle pods. Robust across 0.5 to 2 core thresholds.
   consumer is almost entirely active
 
 ---
+
+<!-- _class: plotright -->
 
 # Idle holders by pool
 
@@ -226,17 +251,7 @@ and tunable on the real trace.
 
 ---
 
-# Backup: unsatisfied requests
-
-![h:430](plots/07_unsatisfied.svg)
-
----
-
-# Backup: hold durations
-
-![h:430](plots/08_hold_durations.svg)
-
----
+<!-- _class: plotright -->
 
 # Backup: top consumers per pool
 
