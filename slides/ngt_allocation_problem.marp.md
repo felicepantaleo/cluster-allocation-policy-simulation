@@ -39,7 +39,7 @@ cluster monitoring, 30 days at 5 min resolution.
 
 ### Scope
 
-1571 GPU/MIG requests from 114 users on the on-premise pools.
+1447 GPU/MIG requests from 111 users on the on-premise pools.
 STEAM Academy accounts and cloud T4 nodes excluded.
 
 </div>
@@ -75,7 +75,7 @@ Users mapped to WP1 to WP3 via the project roster, group and manual classificati
 
 ![h:430](plots/02_waits.svg)
 
-75 to 90% of requests are satisfied immediately; the H100 NVL p95 wait is 15.5 h.
+75 to 90% of requests are satisfied immediately; the H100 NVL p95 wait is 15.6 h.
 
 ---
 
@@ -91,7 +91,7 @@ Peak backlog: 32 simultaneous Pending requests, stacked by target pool.
 
 ![h:410](plots/07_unsatisfied.svg)
 
-146 requests (9%) were never satisfied; their owners gave up after a
+146 requests (10%) were never satisfied; their owners gave up after a
 median 72 minutes of waiting.
 
 ---
@@ -112,8 +112,8 @@ Over half of all queue pressure is top-up demand from users already running.
 
 ![bg right:56% fit](plots/04_idle_gpu_hours.svg)
 
-- 53 000 GPU-hours parked in 30 days
-- 267 kCHF/month cloud equivalent
+- 47 000 GPU-hours parked in 30 days
+- 235 kCHF/month cloud equivalent
 - Right axes: kCHF/day per pool
 - Continuous idle baseline on NVL and L40S; bursty parked episodes on SXM
 
@@ -131,7 +131,7 @@ The L40S pool is idle for 91% of its held hours: mainly explained by spiky heter
 
 ![h:400](plots/20_gpu_vs_pod_idle.svg)
 
-Only 20% of GPU-idle hours run real CPU work (>= 1 core); 80% are fully
+Only 21% of GPU-idle hours run real CPU work (>= 1 core); 79% are fully
 idle pods. Robust across 0.5 to 2 core thresholds.
 
 ---
@@ -152,8 +152,8 @@ The p95 hold is 16.7 days; 68 multi-GPU holds exceed 24 hours.
 
 - Solid = held idle, pale = active
 - Dashed line: one dev GPU holding 24/7 all month (720 GPU-h).
-- **20 users** exceed it
-- **26 700 GPU-hours** sit above it
+- **25 users** exceed it
+- **30 100 GPU-hours** sit above it
 - The consumption and idleness rankings select different users: the top
   consumer is almost entirely active
 
@@ -177,8 +177,8 @@ The p95 hold is 16.7 days; 68 multi-GPU holds exceed 24 hours.
 
 ![h:410](plots/16_cloud_cost_chf.svg)
 
-Rental equivalent: 480 kCHF/month, of which at least 267 kCHF idle
-(3.2 MCHF/year). On-demand rates, July 2026 (AWS).
+Rental equivalent: 523 kCHF/month, of which at least 289 kCHF idle
+(3.5 MCHF/year). On-demand rates, July 2026 (AWS).
 
 ---
 
@@ -194,17 +194,18 @@ Simulated the same 30 days, same requests, replayed through the proposed policy:
 
 | | Today (FCFS) | Proposed |
 |---|---|---|
-| wait p95 | 557 min | **0 min** |
-| requests satisfied | 96.7% | **99.4%** |
-| dev sessions within 15 min | 91% | **98%** |
-| NVL idle-held GPU-hours | 35 800 | **13 600** |
+| wait p95 | 965 min | **0 min** |
+| requests satisfied | 95.7% | **99.4%** |
+| dev sessions within 15 min | 88% | **100%** |
+| NVL idle-held GPU-hours | 38 000 | **14 300** |
 | running work terminated by the system | none | **none** |
 
 > Policy: one interactive session per member (a new session supersedes
 > the previous one); multi-GPU beyond a 96 GPU-h/month interactive
 > allowance runs as batch behind a WP fair-share priority queue.
 > Fixed-behavior replay, identical requests for every policy; the FCFS
-> baseline reproduces observed waits (median exact, p95 within factor 2).
+> baseline reproduces the observed waits at the median, and to within a
+> factor of about three at p95.
 
 ---
 
@@ -259,7 +260,7 @@ and tunable on the real trace.
 
 - Secondary axis: cloud-equivalent kCHF, cheapest of AWS/GCP, July 2026
 - Dashed: one GPU 24/7 all month
-- 31 users held more than one GPU-month
+- 24 users held more than one GPU-month
 
 ---
 

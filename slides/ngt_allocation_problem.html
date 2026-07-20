@@ -15,7 +15,7 @@ cluster monitoring, 30 days at 5 min resolution.</p>
 </div>
 <div class="card short">
 <h3 id="scope">Scope</h3>
-<p>1571 GPU/MIG requests from 114 users on the on-premise pools.<br />
+<p>1447 GPU/MIG requests from 111 users on the on-premise pools.<br />
 STEAM Academy accounts and cloud T4 nodes excluded.</p>
 </div>
 <div class="card short">
@@ -42,7 +42,7 @@ Idle = GPU utilization below 5%.</p>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-footer="NGT PMC, July 2026" data-class="plotright" data-theme="cern-ngt" lang="en-GB" class="plotright" data-marpit-pagination="3" style="" data-marpit-pagination-total="21" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="4" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="4" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="21">
 <h1 id="waiting-times">Waiting times</h1>
 <p><img src="plots/02_waits.svg" alt="" style="height:430px;" /></p>
-<p>75 to 90% of requests are satisfied immediately; the H100 NVL p95 wait is 15.5 h.</p>
+<p>75 to 90% of requests are satisfied immediately; the H100 NVL p95 wait is 15.6 h.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="5" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="5" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="21">
@@ -54,7 +54,7 @@ Idle = GPU utilization below 5%.</p>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="6" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="6" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="21">
 <h1 id="unsatisfied-requests">Unsatisfied requests</h1>
 <p><img src="plots/07_unsatisfied.svg" alt="" style="height:410px;" /></p>
-<p>146 requests (9%) were never satisfied; their owners gave up after a<br />
+<p>146 requests (10%) were never satisfied; their owners gave up after a<br />
 median 72 minutes of waiting.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
@@ -69,8 +69,8 @@ Over half of all queue pressure is top-up demand from users already running.</p>
 <h1 id="idle-held-gpu-hours">Idle held GPU-hours</h1>
 
 <ul>
-<li>53 000 GPU-hours parked in 30 days</li>
-<li>267 kCHF/month cloud equivalent</li>
+<li>47 000 GPU-hours parked in 30 days</li>
+<li>235 kCHF/month cloud equivalent</li>
 <li>Right axes: kCHF/day per pool</li>
 <li>Continuous idle baseline on NVL and L40S; bursty parked episodes on SXM</li>
 </ul>
@@ -85,7 +85,7 @@ Over half of all queue pressure is top-up demand from users already running.</p>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="10" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="10" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="21">
 <h1 id="gpu-idle-vs-pod-idle">GPU-idle vs pod-idle</h1>
 <p><img src="plots/20_gpu_vs_pod_idle.svg" alt="" style="height:400px;" /></p>
-<p>Only 20% of GPU-idle hours run real CPU work (&gt;= 1 core); 80% are fully<br />
+<p>Only 21% of GPU-idle hours run real CPU work (&gt;= 1 core); 79% are fully<br />
 idle pods. Robust across 0.5 to 2 core thresholds.</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
@@ -101,8 +101,8 @@ idle pods. Robust across 0.5 to 2 core thresholds.</p>
 <ul>
 <li>Solid = held idle, pale = active</li>
 <li>Dashed line: one dev GPU holding 24/7 all month (720 GPU-h).</li>
-<li><strong>20 users</strong> exceed it</li>
-<li><strong>26 700 GPU-hours</strong> sit above it</li>
+<li><strong>25 users</strong> exceed it</li>
+<li><strong>30 100 GPU-hours</strong> sit above it</li>
 <li>The consumption and idleness rankings select different users: the top<br />
 consumer is almost entirely active</li>
 </ul>
@@ -123,8 +123,8 @@ construction</li>
 </foreignObject><foreignObject width="1280" height="720" data-marpit-advanced-background="pseudo"><section data-paginate="true" data-footer="NGT PMC, July 2026" data-class="plotright" data-theme="cern-ngt" lang="en-GB" class="plotright" data-marpit-pagination="13" style="" data-marpit-pagination-total="21" data-marpit-advanced-background="pseudo" data-marpit-advanced-background-split="right"></section></foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="14" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="14" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="21">
 <h1 id="cloud-equivalent-cost">Cloud-equivalent cost</h1>
 <p><img src="plots/16_cloud_cost_chf.svg" alt="" style="height:410px;" /></p>
-<p>Rental equivalent: 480 kCHF/month, of which at least 267 kCHF idle<br />
-(3.2 MCHF/year). On-demand rates, July 2026 (AWS).</p>
+<p>Rental equivalent: 523 kCHF/month, of which at least 289 kCHF idle<br />
+(3.5 MCHF/year). On-demand rates, July 2026 (AWS).</p>
 <footer>NGT PMC, July 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="15" data-paginate="true" data-footer="NGT PMC, July 2026" data-theme="cern-ngt" lang="en-GB" data-marpit-pagination="15" style="--paginate:true;--footer:NGT PMC, July 2026;--theme:cern-ngt;" data-marpit-pagination-total="21">
@@ -146,23 +146,23 @@ construction</li>
 <tbody>
 <tr>
 <td>wait p95</td>
-<td>557 min</td>
+<td>965 min</td>
 <td><strong>0 min</strong></td>
 </tr>
 <tr>
 <td>requests satisfied</td>
-<td>96.7%</td>
+<td>95.7%</td>
 <td><strong>99.4%</strong></td>
 </tr>
 <tr>
 <td>dev sessions within 15 min</td>
-<td>91%</td>
-<td><strong>98%</strong></td>
+<td>88%</td>
+<td><strong>100%</strong></td>
 </tr>
 <tr>
 <td>NVL idle-held GPU-hours</td>
-<td>35 800</td>
-<td><strong>13 600</strong></td>
+<td>38 000</td>
+<td><strong>14 300</strong></td>
 </tr>
 <tr>
 <td>running work terminated by the system</td>
@@ -176,7 +176,8 @@ construction</li>
 the previous one); multi-GPU beyond a 96 GPU-h/month interactive<br />
 allowance runs as batch behind a WP fair-share priority queue.<br />
 Fixed-behavior replay, identical requests for every policy; the FCFS<br />
-baseline reproduces observed waits (median exact, p95 within factor 2).</p>
+baseline reproduces the observed waits at the median, and to within a<br />
+factor of about three at p95.</p>
 </blockquote>
 <footer>NGT PMC, July 2026</footer>
 </section>
@@ -212,7 +213,7 @@ and tunable on the real trace.</p>
 <ul>
 <li>Secondary axis: cloud-equivalent kCHF, cheapest of AWS/GCP, July 2026</li>
 <li>Dashed: one GPU 24/7 all month</li>
-<li>31 users held more than one GPU-month</li>
+<li>24 users held more than one GPU-month</li>
 </ul>
 <footer>NGT PMC, July 2026</footer>
 </section>

@@ -154,15 +154,35 @@ def main() -> None:
                            "h100sxm" if "h100-sxm" in n else
                            "l40s" if "l40s" in n else
                            "amd" if ("mi300" in n or "w7900" in n) else None)
-    open_c = {}
-    for c in sorted(cords, key=lambda c: c["time"]):
-        if c["cordoned"]:
-            open_c[c["node_id"]] = c["time"]
-        elif c["node_id"] in open_c:
-            a = open_c.pop(c["node_id"])
-            i, j = np.searchsorted(grid, [a, c["time"]])
+    # cordon occupancy straight from the raw samples, merged per node with a
+    # 1 h gap. The derived cordons.jsonl splits a sustained cordon into
+    # per-day-file intervals that touch at the 12:00 extraction boundary; an
+    # open/close counter breaks on those shared boundaries and collapses a
+    # continuous cordon into spikes, so we do not use it here.
+    node_samples = defaultdict(list)
+    for f in sorted(Path("data/monit").glob("cordon.*.json")):
+        for s in json.loads(f.read_text()):
+            nid = s["metric"].get("node")
+            if nid:
+                node_samples[nid] += [t for t, _ in s["values"]]
+    for nid, ts in node_samples.items():
+        ts = sorted(set(ts))
+        if not ts:
+            continue
+        runs, a = [], ts[0]
+        prev = ts[0]
+        for t in ts[1:]:
+            if t - prev > 3600:
+                runs.append((a, prev + 300))
+                a = t
+            prev = t
+        runs.append((a, prev + 300))
+        p = from_pool(nid.lower())
+        if p is None:
+            continue  # CPU/storage/master nodes: not GPU-pool maintenance
+        for a0, b0 in runs:
+            i, j = np.searchsorted(grid, [a0, b0])
             n_cord[i:j] += 1
-            p = from_pool(c["node_id"].lower())
             if p in cord_gpus:
                 cord_gpus[p][i:j] += NODE_GPUS.get(p, 4)
     amd_cap = float(alloc["amd"].max()) if alloc["amd"].max() > 0 else 8
@@ -850,17 +870,16 @@ def main() -> None:
     fig.tight_layout()
     save(fig, out, "21_user_peak_concurrency.png")
 
-    # ---- 09 cordons
+    # ---- 09 cordons (GPU-pool nodes only)
+    n_gpu_nodes = 12 + 6 + 7 + 2 + 6  # NVL, SXM, L40S, MI300X, W7900
     fig, ax = plt.subplots(figsize=(13, 5.5))
     ax.fill_between(gdt, n_cord, step="mid", color=GRAY, alpha=0.8)
-    ax.axhline(73 / 6, color="black", linestyle="--", linewidth=1.2,
-               label="1 node in 6")
-    ax.set_ylabel("nodes cordoned (of 73)")
-    ax.set_title(f"Maintenance cordons average {n_cord.mean():.1f} nodes "
-                 f"({100*n_cord.mean()/73:.0f}% of the cluster), "
-                 f"peaking at {int(n_cord.max())}", loc="left")
+    ax.set_ylabel(f"GPU-pool nodes cordoned (of {n_gpu_nodes})")
+    ax.set_ylim(bottom=0)
+    ax.set_title("GPU-node cordons: a baseline of chronically drained nodes "
+                 f"(mean {n_cord.mean():.1f}, peak {int(n_cord.max())}) plus "
+                 "the 6-8 July maintenance spike", loc="left")
     stamp(ax, window)
-    ax.legend(fontsize=12)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
     save(fig, out, "09_cordons.png")
 
