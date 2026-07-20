@@ -77,8 +77,9 @@ def draw(ax, gdt, active, idle, pend, title, seen=None):
         ax.fill_between(gdt, -0.12 * ymax * (pend > 0), 0, step="mid",
                         color=GRAY, linewidth=0)
     ax.set_ylim(-0.16 * ymax, ymax * 1.1)
-    ax.set_title(title, fontsize=10, loc="left")
-    ax.set_ylabel("GPUs")
+    ax.set_title(title, fontsize=22, loc="left")
+    ax.set_ylabel("GPUs", fontsize=20)
+    ax.tick_params(labelsize=18)
     # GPUs are integer: integer ticks only, at most ~5 of them
     ax.yaxis.set_major_locator(
         mticker.MaxNLocator(integer=True, nbins=5, min_n_ticks=1))
@@ -156,7 +157,7 @@ def main() -> None:
             draw(ax, gdt, a, i, pe,
                  f"{u} ({w}) - {held[u]:.0f} GPU-h held, {idlepct:.0f}% idle, "
                  f"peak {peak(u)} GPU", seen)
-            ax.legend(handles=[plt.Rectangle((0,0),1,1,color=POOL_COLOR[p],label=POOL_LABEL[p]) for p in FULLGPU if a[p].max() or i[p].max()], fontsize=7, loc="upper right", ncol=4)
+            ax.legend(handles=[plt.Rectangle((0,0),1,1,color=POOL_COLOR[p],label=POOL_LABEL[p]) for p in FULLGPU if a[p].max() or i[p].max()], fontsize=16, loc="upper right", ncol=4)
             ax.set_xlim(gdt[0], gdt[-1])
             fig.tight_layout()
             fig.savefig(wdir / f"{rank:03d}_{u}.png", dpi=110,
@@ -185,7 +186,7 @@ def main() -> None:
         handles += [plt.Rectangle((0, 0), 1, 1, color="#666", label="active"),
                     plt.Rectangle((0, 0), 1, 1, color="#666", alpha=0.32,
                                   label="held idle")]
-        fig.legend(handles=handles, fontsize=10, ncol=len(handles),
+        fig.legend(handles=handles, fontsize=22, ncol=len(handles),
                    loc="upper right", bbox_to_anchor=(0.995, 0.997))
         for ax in axes[-1]:
             ax.set_xlim(gdt[0], gdt[-1])
@@ -194,7 +195,7 @@ def main() -> None:
         fig.suptitle(f"{w} GPU timelines: {n} users, {wgpu:.0f} GPU-h held, "
                      f"{100*widle/wgpu:.0f}% idle "
                      "(colour = pool; solid = active, pale = held idle)",
-                     fontsize=14)
+                     fontsize=28)
         fig.tight_layout(rect=(0, 0, 1, 0.99))
         fig.savefig(parent / f"23_user_timelines_{w}.png", dpi=110,
                     bbox_inches="tight")
