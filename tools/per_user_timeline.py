@@ -73,10 +73,7 @@ def draw(ax, gdt, active, idle, pend, title, seen=None):
                         alpha=0.32, linewidth=0)
         base = base + i
     ymax = max(base.max(), 1)
-    if pend.max() > 0:
-        ax.fill_between(gdt, -0.12 * ymax * (pend > 0), 0, step="mid",
-                        color=GRAY, linewidth=0)
-    ax.set_ylim(-0.16 * ymax, ymax * 1.1)
+    ax.set_ylim(0, ymax * 1.1)
     ax.set_title(title, fontsize=22, loc="left")
     ax.set_ylabel("GPUs", fontsize=20)
     ax.tick_params(labelsize=18)
