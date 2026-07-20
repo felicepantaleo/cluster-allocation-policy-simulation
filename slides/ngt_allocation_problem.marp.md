@@ -280,3 +280,17 @@ and tunable on the real trace.
 </div>
 
 </div>
+
+---
+
+<!-- _class: plotright -->
+
+# Backup: node cordon timeline
+
+![bg right:58% fit](plots/22_cordon_timeline.png)
+
+One row per node; label `%` = share of the month cordoned.
+
+- A few nodes chronically drained: one SXM 43% (1 to 15 Jul), one L40S
+  73%, MI300X and storage ~100%
+- The 6 to 8 July burst of short bars is the coordinated maintenance
