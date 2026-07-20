@@ -26,41 +26,52 @@ import mplhep as hep
 import numpy as np
 
 plt.style.use(hep.style.CMS)
-BLUE, RED, GRAY = "#5790fc", "#e42536", "#9c9ca1"
+GRAY = "#9c9ca1"
 H = 3600.0
 FULLGPU = ("h100nvl", "h100sxm", "l40s", "amd")
+POOL_COLOR = {"h100nvl": "#5790fc", "h100sxm": "#f89c20",
+              "l40s": "#964a8b", "amd": "#7a21dd"}
+POOL_LABEL = {"h100nvl": "H100 NVL", "h100sxm": "H100 SXM",
+              "l40s": "L40S", "amd": "AMD"}
 
 
 def user_series(reqs, grid):
-    """active[g], idle[g], pend[g] GPU counts per grid bin for one user."""
-    active = np.zeros(len(grid))
-    idle = np.zeros(len(grid))
+    """per-pool active[g] and idle[g] GPU counts, plus pending[g]."""
+    active = {p: np.zeros(len(grid)) for p in FULLGPU}
+    idle = {p: np.zeros(len(grid)) for p in FULLGPU}
     pend = np.zeros(len(grid))
     for r in reqs:
         for a, b in r["observed"].get("pending_intervals", []):
             i, j = np.searchsorted(grid, [a, b])
             pend[i:j] += 1
         ivs = r["observed"].get("running_intervals", [])
-        if not ivs:
+        if not ivs or r["pool"] not in FULLGPU:
             continue
         t = ivs[0][0]
         prof = r["profile"] or [(sum(b - a for a, b in ivs), 1.0)]
-        covered = sum(d for d, _ in prof)
-        for a, b in ivs:  # if profile shorter than hold, pad tail active
-            pass
         for d, u in prof:
             i, j = np.searchsorted(grid, [t, t + d])
-            (active if u >= 0.05 else idle)[i:j] += r["gpus"]
+            (active if u >= 0.05 else idle)[r["pool"]][i:j] += r["gpus"]
             t += d
     return active, idle, pend
 
 
-def draw(ax, gdt, active, idle, pend, title):
-    ax.fill_between(gdt, active, step="mid", color=BLUE, linewidth=0,
-                    label="GPU active")
-    ax.fill_between(gdt, active, active + idle, step="mid", color=RED,
-                    alpha=0.85, linewidth=0, label="held idle")
-    ymax = max((active + idle).max(), 1)
+def draw(ax, gdt, active, idle, pend, title, seen=None):
+    base = np.zeros(len(gdt))
+    for p in FULLGPU:
+        a, i = active[p], idle[p]
+        if a.max() == 0 and i.max() == 0:
+            continue
+        lbl = POOL_LABEL[p] if seen is not None and p not in seen else None
+        if seen is not None:
+            seen.add(p)
+        ax.fill_between(gdt, base, base + a, step="mid", color=POOL_COLOR[p],
+                        linewidth=0, label=lbl)
+        base = base + a
+        ax.fill_between(gdt, base, base + i, step="mid", color=POOL_COLOR[p],
+                        alpha=0.32, linewidth=0)
+        base = base + i
+    ymax = max(base.max(), 1)
     if pend.max() > 0:
         ax.fill_between(gdt, -0.12 * ymax * (pend > 0), 0, step="mid",
                         color=GRAY, linewidth=0)
@@ -124,14 +135,24 @@ def main() -> None:
             continue
         wdir = out / w
         wdir.mkdir(parents=True, exist_ok=True)
+
+        def idle_h(u):
+            return sum(series[u][1][p].sum() for p in FULLGPU) * 0.5
+
+        def peak(u):
+            a, i, _ = series[u]
+            return int(max((sum(a[p] for p in FULLGPU)
+                            + sum(i[p] for p in FULLGPU)).max(), 0))
+
         for rank, u in enumerate(wu):
             a, i, pe = series[u]
-            idlepct = min(100, 100 * i.sum() * 0.5 / held[u]) if held[u] else 0
+            idlepct = min(100, 100 * idle_h(u) / held[u]) if held[u] else 0
             fig, ax = plt.subplots(figsize=(13, 3.0))
+            seen = set()
             draw(ax, gdt, a, i, pe,
                  f"{u} ({w}) - {held[u]:.0f} GPU-h held, {idlepct:.0f}% idle, "
-                 f"peak {int((a+i).max())} GPU")
-            ax.legend(fontsize=8, loc="upper right", ncol=2)
+                 f"peak {peak(u)} GPU", seen)
+            ax.legend(handles=[plt.Rectangle((0,0),1,1,color=POOL_COLOR[p],label=POOL_LABEL[p]) for p in FULLGPU if a[p].max() or i[p].max()], fontsize=7, loc="upper right", ncol=4)
             ax.set_xlim(gdt[0], gdt[-1])
             fig.tight_layout()
             fig.savefig(wdir / f"{rank:03d}_{u}.png", dpi=110,
@@ -144,21 +165,32 @@ def main() -> None:
                                  figsize=(19, 2.4 * max(rows, 1) + 0.5),
                                  sharex=True, squeeze=False)
         flat = axes.ravel()
+        seen = set()
         for ax, u in zip(flat, wu):
             a, i, pe = series[u]
-            draw(ax, gdt, a, i, pe,
-                 f"{u} - {held[u]:.0f} GPU-h, "
-                 f"{min(100, 100*i.sum()*0.5/held[u]) if held[u] else 0:.0f}% idle")
+            ip = min(100, 100 * idle_h(u) / held[u]) if held[u] else 0
+            draw(ax, gdt, a, i, pe, f"{u} - {held[u]:.0f} GPU-h, {ip:.0f}% idle",
+                 seen)
         for ax in flat[n:]:
             ax.axis("off")
-        flat[0].legend(fontsize=8, loc="upper right", ncol=2)
+        present = [p for p in FULLGPU
+                   if any(series[u][0][p].max() or series[u][1][p].max()
+                          for u in wu)]
+        handles = [plt.Rectangle((0, 0), 1, 1, color=POOL_COLOR[p],
+                                 label=POOL_LABEL[p]) for p in present]
+        handles += [plt.Rectangle((0, 0), 1, 1, color="#666", label="active"),
+                    plt.Rectangle((0, 0), 1, 1, color="#666", alpha=0.32,
+                                  label="held idle")]
+        fig.legend(handles=handles, fontsize=10, ncol=len(handles),
+                   loc="upper right", bbox_to_anchor=(0.995, 0.997))
         for ax in axes[-1]:
             ax.set_xlim(gdt[0], gdt[-1])
         wgpu = sum(held[u] for u in wu)
-        widle = sum(series[u][1].sum() * 0.5 for u in wu)
+        widle = sum(idle_h(u) for u in wu)
         fig.suptitle(f"{w} GPU timelines: {n} users, {wgpu:.0f} GPU-h held, "
                      f"{100*widle/wgpu:.0f}% idle "
-                     "(blue = active, red = held idle)", fontsize=14)
+                     "(colour = pool; solid = active, pale = held idle)",
+                     fontsize=14)
         fig.tight_layout(rect=(0, 0, 1, 0.99))
         fig.savefig(parent / f"23_user_timelines_{w}.png", dpi=110,
                     bbox_inches="tight")
