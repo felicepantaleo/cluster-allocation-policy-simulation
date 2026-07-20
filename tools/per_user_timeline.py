@@ -21,6 +21,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.dates as mdates
+import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
@@ -78,6 +79,9 @@ def draw(ax, gdt, active, idle, pend, title, seen=None):
     ax.set_ylim(-0.16 * ymax, ymax * 1.1)
     ax.set_title(title, fontsize=10, loc="left")
     ax.set_ylabel("GPUs")
+    # GPUs are integer: integer ticks only, at most ~5 of them
+    ax.yaxis.set_major_locator(
+        mticker.MaxNLocator(integer=True, nbins=5, min_n_ticks=1))
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=5))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
 
