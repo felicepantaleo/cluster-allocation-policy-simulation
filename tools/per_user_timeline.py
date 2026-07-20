@@ -151,7 +151,7 @@ def main() -> None:
         for rank, u in enumerate(wu):
             a, i, pe = series[u]
             idlepct = min(100, 100 * idle_h(u) / held[u]) if held[u] else 0
-            fig, ax = plt.subplots(figsize=(13, 3.0))
+            fig, ax = plt.subplots(figsize=(13, 12.0))
             seen = set()
             draw(ax, gdt, a, i, pe,
                  f"{u} ({w}) - {held[u]:.0f} GPU-h held, {idlepct:.0f}% idle, "
@@ -166,7 +166,7 @@ def main() -> None:
         n = len(wu)
         rows = (n + 1) // 2
         fig, axes = plt.subplots(max(rows, 1), 2,
-                                 figsize=(19, 2.4 * max(rows, 1) + 0.5),
+                                 figsize=(19, 9.6 * max(rows, 1) + 0.5),
                                  sharex=True, squeeze=False)
         flat = axes.ravel()
         seen = set()
