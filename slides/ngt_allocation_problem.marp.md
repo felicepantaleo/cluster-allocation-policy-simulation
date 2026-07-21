@@ -263,26 +263,6 @@ and tunable on the real trace.
 
 ---
 
-# Backup: pools and cordons
-
-<div class="columns">
-
-<div>
-
-![h:330](plots/12_pool_usage_by_wp.svg)
-
-</div>
-
-<div>
-
-![h:330](plots/09_cordons.svg)
-
-</div>
-
-</div>
-
----
-
 <!-- _class: plotright -->
 
 # Backup: node cordon timeline
