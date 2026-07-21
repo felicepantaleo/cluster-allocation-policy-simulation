@@ -224,10 +224,9 @@ opening a new one replaces the old.
 
 <div class="card compact">
 
-### Multi-GPU is batch
+### Multi-GPU is batch by default
 
-Submitted, executed, exits at completion, behind a priority queue with
-WP fair share. A 96 GPU-h/month interactive allowance covers debugging. 
+Submitted, executed, exits at completion. A few hundreds GPU-h/month interactive allowance covers debugging and benchmarking.
 Amount to be tuned.
 
 </div>
