@@ -9,6 +9,11 @@ on the same trace and seed.
 Governing allocation principles: `PRINCIPLES.md` (priority-ordered).
 Phase 1 findings: `docs/phase1-findings.md`.
 
+**Reproduce the whole study end to end** (collect the real cluster data from
+CERN MONIT, derive the trace, attribute users to working packages, rebuild
+every gallery plot, run the simulator and the real-trace replay, render the
+deck): `docs/REPRODUCE.md`.
+
 ## Layout
 
     clustersim/
