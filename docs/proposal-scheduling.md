@@ -1,6 +1,6 @@
 # Proposal: a fair-share scheduling policy for the NGT GPU cluster
 
-Author: Felice Pantaleo. For discussion in the PMC.
+
 
 ## 1. Summary
 
@@ -17,8 +17,7 @@ measured NGT trace that it fixes the problems we recorded.
 ## 2. The measured problem
 
 All numbers below are from the 30 to 40 day MONIT extraction of the real
-cluster and the replay in `results/replay/comparison.md`. Reproduction:
-`docs/REPRODUCE.md`.
+cluster.
 
 - Demand exists and waits are long. 1948 GPU and MIG requests from 144 users
   in 40 days. Under the current policy the NVL pool wait is p95 930 minutes.
