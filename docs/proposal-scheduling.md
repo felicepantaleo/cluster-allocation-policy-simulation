@@ -300,6 +300,38 @@ only after PMC approval, time-boxed.
   hold, and it is preemptible when the cluster fills and its package is over
   share.
 
+What `U` and `S` are, and how to set them for NGT:
+
+- `S` is the target share of each working package: the PMC split (WP1 30, WP2
+  30, WP3 30, WP4 10), renormalized over the packages with live demand in the
+  window so the shares sum to 1. With WP4 idle, the active split is WP1, WP2,
+  WP3 at 0.333 each.
+- `U` is the package's measured share of delivered GPU-hours over the last 7
+  days, with the 7-day half-life weighting, normalized so it sums to 1 across
+  packages. The free GPU and the excluded pools (STEAM T4) do not enter `U`.
+  Each charge is held wall time times GPU count times the per-model factor,
+  weighted by `2^(-age / 7 days)`, and summed per package.
+- Recompute both every few minutes (Slurm recomputes every 5 minutes by
+  default).
+
+Worked example on the measured month. Over the real window WP3 ran heavy: its
+delivered share was about 0.37 against a 0.30 target. Take a 7-day snapshot with
+active shares `S = 0.333` each and normalized usage `U` = {WP1 0.28, WP2 0.30,
+WP3 0.42}:
+
+| WP | S | U | F = 2^(-U/S) |
+|---|---|---|---|
+| WP1 | 0.333 | 0.28 | 0.56 |
+| WP2 | 0.333 | 0.30 | 0.54 |
+| WP3 | 0.333 | 0.42 | 0.42 |
+
+A new request from WP1, under its share, outranks one from WP3, over its share,
+by 0.56 to 0.42. So WP3's heavier recent use puts its next request behind WP1
+and WP2. As WP3 stops consuming, its `U` decays with the 7-day half-life and its
+factor climbs back. The free GPU is exempt, so a member of WP3 still gets one
+GPU at once with no wait. The numbers here are illustrative; the real `U` is
+computed from the trace.
+
 ### 5.4 Reservations (principle 7)
 
 Reserve part of the farm for a specific use case only after PMC approval and
