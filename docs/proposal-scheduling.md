@@ -53,7 +53,8 @@ number wins on conflict.
 3. The free GPU is reclaimed automatically after an idle period.
 4. Every allocation beyond the first GPU declares a maximum duration, at most
    7 days. It can be extended without limit, in 7-day steps. Whether the work
-   is interactive or batch does not matter.
+   is interactive or batch does not matter. An allocation can span several GPUs
+   or several nodes, for example an MPI job.
 5. Accounting is per working package over the last 7 days.
 6. As a working package uses more in that window, its members get lower
    priority for new allocations beyond the one free GPU. Priority plus
@@ -231,6 +232,14 @@ only after PMC approval, time-boxed.
 - There is no interactive-versus-batch distinction. Any allocation beyond the
   member's free GPU, whether a notebook or a training job, follows the same two
   rules: it declares a maximum duration and it costs priority.
+- An allocation can span several GPUs or several nodes, for example an MPI or
+  NCCL job across nodes. A multi-node allocation is gang-scheduled: all its
+  nodes are admitted together or none is, so no rank sits idle waiting for the
+  rest. Placement is interconnect-aware, keeping the ranks on the NVLink mesh
+  (SXM pool) or the RDMA fabric. Gang scheduling and topology-aware placement
+  are standard: Kueue admits a workload all-or-nothing, Volcano binds a
+  `PodGroup` by `minMember`, and both expose topology-aware scheduling for
+  NVLink and RDMA.
 - The maximum duration is at most 7 days. It is mandatory at submission; if
   omitted, a default cap applies. This closes the present-day gap that requests
   carry no time at all (2). A hard duration cap with a default is universal on
@@ -366,6 +375,9 @@ admission webhook and an idle-culling alert, so the pieces are in class.
 - Declared duration: native Job `activeDeadlineSeconds` from the declared time,
   plus `ttlSecondsAfterFinished` for cleanup. Renewal in 7-day steps recreates
   the Job with a fresh deadline.
+- Multi-node gang scheduling for MPI or NCCL: Kueue all-or-nothing admission or
+  Volcano `PodGroup` `minMember`, with topology-aware scheduling to keep ranks
+  on the NVLink mesh or the RDMA fabric. Both support it (implementability.md).
 - One free GPU per member with swap: a validating webhook plus a small
   controller that deletes the superseded free GPU. Same complexity as the
   webhook already deployed.
