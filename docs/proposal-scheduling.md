@@ -6,13 +6,13 @@ Author: Felice Pantaleo. For discussion in the PMC.
 
 The NGT cluster runs first come first served. A session is a bare Pod. There
 is no queue, no quota, and no time limit. This proposal replaces that with the
-policy that every large shared GPU center already runs: a small guaranteed
-interactive tier, a time-limited batch tier for everything larger, and
+policy that every large shared GPU center already runs: one free GPU per member
+that is always available, every GPU beyond it time-bounded and charged, and
 fair-share priority across the working packages accounted over a rolling
-window. The design is not novel. The same three parts run at NERSC, Harvard
-FASRC, Stanford, Princeton, the KU cluster, and inside NVIDIA Run:ai. This
-document states the policy, shows that it matches real-world practice, and
-shows on the measured NGT trace that it fixes the problems we recorded.
+window. The design is not novel. The same parts run at NERSC, Harvard FASRC,
+Stanford, Princeton, the KU cluster, and inside NVIDIA Run:ai. This document
+states the policy, shows that it matches real-world practice, and shows on the
+measured NGT trace that it fixes the problems we recorded.
 
 ## 2. The measured problem
 
@@ -45,20 +45,19 @@ users never release GPUs, so the cluster looks full while sitting idle.
 These are the principles this proposal implements, in priority order. Lower
 number wins on conflict.
 
-1. Every member can hold one interactive session of at most one GPU. The
-   member does not have to release it in the evening and can be confident of
-   getting one in the morning.
-2. The first interactive GPU is free and has no priority cost. Interactive
-   GPUs beyond the first are charged to the working package's fair-share, so
-   they cost priority.
-3. The interactive session is terminated automatically after an idle period.
-4. Any larger request (more than one GPU, or long-running) is a batch request
-   with a maximum allocation time, so training runs finish and the GPUs turn
-   over.
+1. Every member can hold one GPU at no priority cost, the free GPU. The member
+   does not have to release it in the evening and can be confident of getting
+   one in the morning. The work on it can be interactive or batch.
+2. Every GPU beyond that first free one is charged to the working package's
+   fair-share, so it costs priority for all members of the package.
+3. The free GPU is reclaimed automatically after an idle period.
+4. Every allocation beyond the first GPU declares a maximum duration, at most
+   7 days. It can be extended without limit, in 7-day steps. Whether the work
+   is interactive or batch does not matter.
 5. Accounting is per working package over the last 7 days.
 6. As a working package uses more in that window, its members get lower
-   priority for new allocations beyond the one guaranteed session. Priority
-   plus accounting together stop anyone holding resources forever, while still
+   priority for new allocations beyond the one free GPU. Priority plus
+   accounting together stop anyone holding resources forever, while still
    allowing multiple or larger long-lived allocations when capacity is free.
 7. Specific use cases can get a reserved slice of the farm, only after PMC
    approval.
@@ -88,7 +87,7 @@ cap is the number of members served at once.
 - Princeton Della offers a single-GPU `mig` partition as the interactive
   target. (researchcomputing.princeton.edu/systems/della)
 
-The sizing rule for NGT: reserve N GPUs for the interactive tier, cap each
+The sizing rule for NGT: reserve N GPUs for the free tier, cap each
 member at one, and N is the number of members served at once. N is set near
 the expected simultaneous morning demand, not the full roster of about 130
 members. NERSC reserves a fraction of the machine, not all of it.
@@ -108,16 +107,17 @@ standard-g 48 h. The safe pattern is a hard cap plus a default, and requeue on
 timeout with a warning signal so the job can checkpoint (Slurm
 `--signal=TERM@120`, `--requeue`).
 
-### 4.3 Interactive small vs batch large is an explicit, enforced split
+### 4.3 A declared maximum duration matters more than the interactive/batch label
 
-The universal rule is that interactive work is single and small and time or
-idle bounded, while heavy or multi-device work must go to batch with a hard
-walltime. The justification is physical: an interactive session is held for
-human latency, so it must be small and reclaimable, while training is
-throughput work that a scheduler can pack, preempt, and turn over. NERSC
-encodes this as separate QOS (`interactive` short and capped vs `regular` long
-and exclusive). University policies cap the short queue at 1 GPU and force
-multi-GPU work to batch.
+Many centers separate a small interactive tier from a long batch tier as
+distinct QOS (NERSC `interactive` short and capped vs `regular` long and
+exclusive; university policies cap a short queue at 1 GPU and send multi-GPU
+work to batch). The load-bearing part of that split is not the label but the
+declared time bound: every allocation carries a maximum duration, so the
+scheduler can pack, turn over, and account it. This proposal keeps the time
+bound and drops the label. Beyond the free GPU, an allocation is bounded by a
+declared duration and priced by the fair-share charge, whether the member calls
+it interactive or batch.
 
 ### 4.4 Idle sessions are culled, and the workspace is kept
 
@@ -182,7 +182,7 @@ match to this proposal: deserved quota is guaranteed and non-preemptible, over
 quota is only for preemptible workloads, and when a project below its share
 needs GPUs the scheduler preempts over-quota work newest first.
 
-Mapping to NGT: the one guaranteed session per member is the protected tier
+Mapping to NGT: the one free GPU per member is the protected tier
 (never preempted). Extra concurrent or larger allocations are opportunistic
 and run while GPUs are free. The fair-share factor sets the order in which
 those opportunistic allocations are admitted and, if the cluster fills, the
@@ -201,73 +201,79 @@ only after PMC approval, time-boxed.
 
 ## 5. The proposed NGT policy
 
-### 5.1 Interactive tier (principles 1, 2, 3)
+### 5.1 The free GPU (principles 1, 2, 3)
 
-- One interactive session per member, at most one GPU. A validating webhook
-  counts the member's running interactive pods and rejects a second. A
-  per-user cap of one on a dedicated interactive tier is the NERSC Perlmutter
-  `interactive` QOS model (docs.nersc.gov/jobs/policy).
-- Opening a new session supersedes the member's old one (swap at start). The
+- One free GPU per member, free of priority cost. The work on it can be
+  interactive or batch. A validating webhook counts the member's free GPUs and
+  rejects a second. A per-user cap of one on a dedicated free tier is
+  the NERSC Perlmutter `interactive` QOS model (docs.nersc.gov/jobs/policy).
+- A new free-GPU request supersedes the member's old one (swap at start). The
   system never terminates another member's work to make room.
-- A member who needs more than one interactive GPU, or more than one node, can
-  request it. There is no gate. Only the first interactive GPU is free.
-  Interactive GPUs beyond the first are charged to the working package's 7-day
-  fair-share, so they lower the package's priority for further allocations, and
-  they yield first when the cluster fills. This is the burst-when-idle,
-  yield-when-busy tier (4.6) applied to interactive work: the fair-share cost
-  self-limits it, so no gate is needed. It is in production as the NVIDIA
-  Run:ai over-quota tier, where in-quota work is guaranteed and over-quota work
-  is preemptible.
 - The tier is sized to be reliably available. Reserve a headroom of GPUs and
   MIG slices for it, spread over at least two physical nodes so one cordon
-  does not empty it. Because most interactive work fits a MIG slice, a single
-  H100 serves several members. A dedicated single-GPU interactive slice
-  target is in production at Princeton Della (`mig` partition,
+  does not empty it. Because most single-GPU work fits a MIG slice, a single
+  H100 serves several members. A dedicated single-GPU slice target is in
+  production at Princeton Della (`mig` partition,
   researchcomputing.princeton.edu/systems/della) and Harvard FASRC
   (`gpu_test`, docs.rc.fas.harvard.edu).
-- Idle culling on GPU utilization near zero, with an overnight-tolerant
-  timeout. Culling on GPU utilization is the NVIDIA Run:ai idle GPU time
-  limit (developer.nvidia.com/blog, run-ai-docs.nvidia.com). Culling frees the
-  GPU and keeps the user's persistent volume, so the member does not have to
-  release the session before leaving and finds the tier free in the morning.
+- The free GPU is reclaimed on GPU utilization near zero, with an
+  overnight-tolerant timeout. Reclaim on GPU utilization is the NVIDIA Run:ai
+  idle GPU time limit (developer.nvidia.com/blog, run-ai-docs.nvidia.com).
+  Reclaim frees the GPU and keeps the user's persistent volume, so the member
+  does not have to release it before leaving and finds one free in the morning.
   Scaling an idle notebook to zero while keeping its volume is the Kubeflow
-  Notebooks culler (`CULL_IDLE_TIME`, preserves the PVC).
+  Notebooks culler (`CULL_IDLE_TIME`, preserves the PVC). A member who needs
+  guaranteed uninterrupted GPU time, without the idle reclaim, uses a paid
+  allocation with a declared duration (5.2) instead.
 
-### 5.2 Batch tier (principle 4)
+### 5.2 Allocations beyond the first GPU (principles 2, 4, 6)
 
-- Any request for more than one GPU, or any long-running request, is a batch
-  job with a declared maximum allocation time. It starts, runs, and exits at
-  the end. There is no interactive multi-GPU hold. The maximum time is
-  mandatory at submission; if omitted, a default cap applies. This closes the
-  present-day gap that requests carry no time at all (2). A hard walltime on
-  batch GPU work is universal: NERSC Perlmutter 48 h, OLCF Frontier 2 to 24 h,
-  ALCF Polaris up to 72 h, JUWELS 24 h, LUMI 48 h; a default when the user
-  omits the time is the Slurm `DefaultTime`.
-- A hard walltime cap with a default, requeue on timeout, and a warning signal
-  before the kill so the job checkpoints. This is the standard training
-  pattern and it is what makes the queue and fairness work at all (4.2). The
-  requeue-and-checkpoint pattern is documented by Slurm (`--requeue`,
-  `--signal=TERM@120`) and by NVIDIA Run:ai for preemptible training.
+- There is no interactive-versus-batch distinction. Any allocation beyond the
+  member's free GPU, whether a notebook or a training job, follows the same two
+  rules: it declares a maximum duration and it costs priority.
+- The maximum duration is at most 7 days. It is mandatory at submission; if
+  omitted, a default cap applies. This closes the present-day gap that requests
+  carry no time at all (2). A hard duration cap with a default is universal on
+  GPU queues (NERSC Perlmutter 48 h, OLCF Frontier 2 to 24 h, ALCF Polaris up
+  to 72 h, JUWELS 24 h, LUMI 48 h; a default is the Slurm `DefaultTime`).
+- The allocation can be extended without limit, in steps of 7 days. The 7-day
+  step equals the fair-share window (5.3) on purpose: each renewal re-competes
+  at the working package's current priority, so a package that held a lot in
+  the last 7 days renews at a lower priority. This is what makes "no allocation
+  forever" (principle 6) bite through cost, not through a forced kill. Renewing
+  a bounded lease is the resubmit-after-walltime pattern every center already
+  runs (Frontier, NERSC); requeue with a warning signal so long work
+  checkpoints (Slurm `--requeue`, `--signal=TERM@120`; NVIDIA Run:ai documents
+  the same for preemptible training).
+- The allocation is charged to the member's working package on held wall time
+  (5.3), so it costs priority for every member of the package, and it yields
+  first when the cluster fills. This is the burst-when-idle, yield-when-busy
+  tier (4.6): the fair-share cost self-limits it, so no approval gate is
+  needed. It is in production as the NVIDIA Run:ai over-quota tier, where
+  in-quota work is guaranteed and over-quota work is preemptible.
 
 ### 5.3 Accounting and priority (principles 2, 5, 6)
 
-- Charge each delivered GPU-hour to the member's working package, except the
-  one guaranteed single-GPU interactive session per member, which is free.
-  Charge is wall time times GPU count times a per-model factor, applied at the
-  end, which is the standard service-unit model (NERSC, OLCF, ALCF, TACC all
-  charge node-hours or GPU-hours times a per-queue factor).
+- Charge each held GPU-hour to the member's working package, except each
+  member's one free GPU. Charge is held wall time times GPU count times a
+  per-model factor, the standard service-unit model (NERSC, OLCF, ALCF, TACC
+  all charge node-hours or GPU-hours times a per-queue factor). The charge is
+  on held time, not used time, so idle holding costs the working package
+  priority automatically. This
+  is the economic replacement for idle reclaim: the study measured 62777
+  idle-held GPU-hours per month, and charging held time prices them without the
+  cluster having to kill anyone's allocation.
 - Account per working package over the last 7 days as a 7-day half-life decay
   (4.5), not a hard reset. A 7-day half-life is the Slurm `PriorityDecayHalfLife`
   default (slurm.schedmd.com), is run verbatim by the KU Community Cluster
   (docs.crc.ku.edu), and is the NVIDIA Run:ai time-based fair-share default
   one-week window (developer.nvidia.com/blog).
-- Order new non-guaranteed requests by the per-WP fair-share factor `F =
+- Order requests beyond the free GPU by the per-WP fair-share factor `F =
   2^(-U/S)`, and within a package by the member's own decayed usage. This
   factor is the Slurm classic fair-share formula, in production per lab at
-  Harvard FASRC and per account at the KU cluster. The one guaranteed
-  single-GPU session per member is exempt from this ordering and is always
-  served. Exempting the guaranteed interactive tier from fair-share
-  accounting is the FASRC `gpu_test` model.
+  Harvard FASRC and per account at the KU cluster. Each member's one free GPU is
+  exempt from this ordering and is always served. Exempting the free single-GPU
+  tier from fair-share accounting is the FASRC `gpu_test` model.
 - Renormalize the target shares `S` over the working packages that have live
   demand. This is a measured requirement, not a detail: WP4 consumed nothing
   in the real month, so a fixed 30/30/30/10 target makes every fair-share
@@ -304,29 +310,33 @@ GPU pods are held only for GPU work.
 ## 6. Evidence that this works on the real trace
 
 Replayed on the measured month (`results/replay/comparison.md`, column
-`batch_multi_queue`, the batch-only realization of this policy), against the
-current policy (`fcfs_pending`):
+`batch_multi_queue`, the queued WP-fair-share realization of this policy),
+against the current policy (`fcfs_pending`):
 
-| metric | current (fcfs) | proposed (batch queue) |
+| metric | current (fcfs) | proposed (queue + fair-share) |
 |---|---|---|
 | wait p95 (min) | 965 | 0 |
 | 1-GPU tier served within 15 min | 88% | 100% |
 | 1-GPU sessions never started | 29 | 0 |
 | NVL idle-held GPU-h | 37978 | 14051 |
 | requests satisfied | 95.7% | 99.5% |
-| longest multi-GPU hold (h) | 665 | batch, exits at end |
+| longest single GPU-hold (h) | 665 (no cap) | 7-day renewable lease |
 
-The interactive guarantee is met for 100 percent of the 866 single-GPU dev
+The free-GPU guarantee is met for 100 percent of the 866 single-GPU dev
 sessions with zero wait, idle holding is cut by roughly two thirds, and no
 other member's work is terminated. The only terminated allocations are a
-member's own superseded sessions.
+member's own superseded free GPUs.
 
-One honest caveat from the replay: because multi-GPU work becomes batch that
-exits at the end, the batch column delivers about 47 percent of the "dev jobs
-done" measure under fixed-behaviour replay. This is an artifact of replaying
-recorded behaviour that assumed indefinite interactive holds; with a declared
-walltime users checkpoint and resubmit, which the fixed trace cannot model. It
-is fair across all intervention variants and does not change the ranking.
+Two caveats from the replay. First, it exercised the load-bearing levers of
+this policy: a queue, the free single-GPU guarantee, per-WP fair-share, and a
+charge on held time. It did not implement the 7-day renewable lease; multi-GPU
+allocations ran to their recorded length. So the idle-holding improvement is a
+lower bound, because the lease cap would reduce held time further. Second, that
+column truncated the recorded indefinite holds, so it delivers about 47 percent
+of the "dev jobs done" measure under fixed-behaviour replay; with a declared
+duration a member checkpoints and renews, which the fixed trace cannot model.
+The artifact is fair across all intervention variants and does not change the
+ranking.
 
 ## 7. Implementation on the NGT stack
 
@@ -342,13 +352,14 @@ admission webhook and an idle-culling alert, so the pieces are in class.
   WP take back its guarantee. This is the k8s realization of 4.5 and 4.6. The
   guaranteed-quota-plus-over-quota-fair-share model it implements is the one
   NVIDIA Run:ai runs in production, open-sourced as the KAI Scheduler.
-- Batch walltime: native Job `activeDeadlineSeconds` from the declared time,
-  plus `ttlSecondsAfterFinished` for cleanup.
-- One interactive session per member with swap: a validating webhook plus a
-  small controller that deletes the superseded session. Same complexity as the
+- Declared duration: native Job `activeDeadlineSeconds` from the declared time,
+  plus `ttlSecondsAfterFinished` for cleanup. Renewal in 7-day steps recreates
+  the Job with a fresh deadline.
+- One free GPU per member with swap: a validating webhook plus a small
+  controller that deletes the superseded free GPU. Same complexity as the
   webhook already deployed.
-- Interactive single-GPU cap: `LimitRange max.nvidia.com/gpu: 1` and a
-  `ResourceQuota` on `requests.nvidia.com/gpu` in the interactive namespace.
+- Free-GPU single-GPU cap: `LimitRange max.nvidia.com/gpu: 1` and a
+  `ResourceQuota` on `requests.nvidia.com/gpu` in the free-tier namespace.
 - 7-day fair-share accounting: a small controller that reads the monitoring
   backend (this study proved the data is queryable with user privileges only)
   and feeds the decayed per-WP usage into the queue ordering.
@@ -359,7 +370,7 @@ admission webhook and an idle-culling alert, so the pieces are in class.
 Two constraints from the hardware and telemetry:
 
 - L40S GPUs do not support MIG (Ada Lovelace lacks the hardware). Small
-  guaranteed interactive slices use MIG on the H100 pools; on L40S use MPS or
+  free-tier single-GPU slices use MIG on the H100 pools; on L40S use MPS or
   time-slicing instead.
 - The cluster exports no per-MIG-slice utilization today. Any idleness signal
   on MIG sessions is blind until DCGM MIG profiling is enabled. Full-GPU pools
@@ -367,12 +378,13 @@ Two constraints from the hardware and telemetry:
 
 ## 8. Parameters for the PMC to fix
 
-- N, the number of GPUs reserved for the interactive tier, and its split
-  between full GPUs and MIG slices.
-- The idle-cull timeout for interactive sessions.
-- The batch walltime cap and its default.
-- Whether interactive allocations beyond the one-GPU guarantee need a hard cap,
-  on top of the fair-share cost.
+- N, the number of GPUs reserved for the free tier, and its split between full
+  GPUs and MIG slices.
+- The idle-reclaim timeout for the free GPU.
+- The maximum allocation duration (proposed 7 days) and the default applied
+  when a request omits it.
+- Whether allocations beyond the one free GPU need a hard cap on GPU count, on
+  top of the fair-share cost.
 - The CPU-time threshold and the kill time for the shared entry node.
 - The fair-share target shares, and the rule for renormalizing over active
   working packages.
