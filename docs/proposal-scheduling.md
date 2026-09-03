@@ -45,12 +45,12 @@ users never release GPUs, so the cluster looks full while sitting idle.
 These are the principles this proposal implements, in priority order. Lower
 number wins on conflict.
 
-1. Every member can hold one interactive session of at most one GPU. This
-   session has no priority cost. Interactive GPUs beyond the first are charged
-   to the working package's fair-share, so they cost priority.
-2. The interactive tier is reliable. A member does not have to release the
-   session in the evening. A member can be confident of getting one in the
-   morning.
+1. Every member can hold one interactive session of at most one GPU. The
+   member does not have to release it in the evening and can be confident of
+   getting one in the morning.
+2. The first interactive GPU is free and has no priority cost. Interactive
+   GPUs beyond the first are charged to the working package's fair-share, so
+   they cost priority.
 3. The interactive session is terminated automatically after an idle period.
 4. Any larger request (more than one GPU, or long-running) is a batch request
    with a maximum allocation time, so training runs finish and the GPUs turn
@@ -249,7 +249,7 @@ only after PMC approval, time-boxed.
   requeue-and-checkpoint pattern is documented by Slurm (`--requeue`,
   `--signal=TERM@120`) and by NVIDIA Run:ai for preemptible training.
 
-### 5.3 Accounting and priority (principles 5, 6)
+### 5.3 Accounting and priority (principles 2, 5, 6)
 
 - Charge each delivered GPU-hour to the member's working package, except the
   one guaranteed single-GPU interactive session per member, which is free.
