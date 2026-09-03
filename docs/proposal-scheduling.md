@@ -279,6 +279,17 @@ only after PMC approval, time-boxed.
   in the real month, so a fixed 30/30/30/10 target makes every fair-share
   variant chase an unreachable 10 percent and show a worse WP deviation than
   the current policy in replay. Targets must renormalize over active packages.
+- The requested duration does not change the priority. Priority comes from the
+  working package's decayed usage `U`, not from how long a request asks for. A
+  single 7-day allocation of 2 GPUs and seven daily 24-hour allocations of 2
+  GPUs deliver the same 336 GPU-hours, so they charge the same and move the
+  priority the same way. The only difference is schedulability: a shorter
+  declared duration backfills into gaps and starts sooner on a busy cluster
+  (4.2), so the incentive points to honest, short declarations, never to
+  splitting for advantage. The long lease gets no free ride either: it is
+  charged continuously on held time, so its package's priority falls during the
+  hold, and it is preemptible when the cluster fills and its package is over
+  share.
 
 ### 5.4 Reservations (principle 7)
 
