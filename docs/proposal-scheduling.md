@@ -195,38 +195,57 @@ only by consensus, time-boxed.
 ### 5.1 Interactive tier (principles 1, 2, 3)
 
 - One interactive session per member, at most one GPU. A validating webhook
-  counts the member's running interactive pods and rejects a second.
+  counts the member's running interactive pods and rejects a second. A
+  per-user cap of one on a dedicated interactive tier is the NERSC Perlmutter
+  `interactive` QOS model (docs.nersc.gov/jobs/policy).
 - Opening a new session supersedes the member's old one (swap at start). The
   system never terminates another member's work to make room.
 - The tier is sized to be reliably available. Reserve a headroom of GPUs and
   MIG slices for it, spread over at least two physical nodes so one cordon
   does not empty it. Because most interactive work fits a MIG slice, a single
-  H100 serves several members.
+  H100 serves several members. A dedicated single-GPU interactive slice
+  target is in production at Princeton Della (`mig` partition,
+  researchcomputing.princeton.edu/systems/della) and Harvard FASRC
+  (`gpu_test`, docs.rc.fas.harvard.edu).
 - Idle culling on GPU utilization near zero, with an overnight-tolerant
-  timeout. Culling frees the GPU and keeps the user's persistent volume, so
-  the member does not have to release the session before leaving and finds the
-  tier free in the morning.
+  timeout. Culling on GPU utilization is the NVIDIA Run:ai idle GPU time
+  limit (developer.nvidia.com/blog, run-ai-docs.nvidia.com). Culling frees the
+  GPU and keeps the user's persistent volume, so the member does not have to
+  release the session before leaving and finds the tier free in the morning.
+  Scaling an idle notebook to zero while keeping its volume is the Kubeflow
+  Notebooks culler (`CULL_IDLE_TIME`, preserves the PVC).
 
 ### 5.2 Batch tier (principle 4)
 
 - Any request for more than one GPU, or any long-running request, is a batch
   job with a declared maximum allocation time. It starts, runs, and exits at
-  the end. There is no interactive multi-GPU hold.
+  the end. There is no interactive multi-GPU hold. A hard walltime on batch
+  GPU work is universal: NERSC Perlmutter 48 h, OLCF Frontier 2 to 24 h, ALCF
+  Polaris up to 72 h, JUWELS 24 h, LUMI 48 h.
 - A hard walltime cap with a default, requeue on timeout, and a warning signal
   before the kill so the job checkpoints. This is the standard training
-  pattern and it is what makes the queue and fairness work at all (4.2).
+  pattern and it is what makes the queue and fairness work at all (4.2). The
+  requeue-and-checkpoint pattern is documented by Slurm (`--requeue`,
+  `--signal=TERM@120`) and by NVIDIA Run:ai for preemptible training.
 
 ### 5.3 Accounting and priority (principles 5, 6)
 
 - Charge each delivered GPU-hour to the member's working package. Charge is
   wall time times GPU count times a per-model factor, applied at the end,
-  which is the standard service-unit model.
+  which is the standard service-unit model (NERSC, OLCF, ALCF, TACC all charge
+  node-hours or GPU-hours times a per-queue factor).
 - Account per working package over the last 7 days as a 7-day half-life decay
-  (4.5), not a hard reset.
+  (4.5), not a hard reset. A 7-day half-life is the Slurm `PriorityDecayHalfLife`
+  default (slurm.schedmd.com), is run verbatim by the KU Community Cluster
+  (docs.crc.ku.edu), and is the NVIDIA Run:ai time-based fair-share default
+  one-week window (developer.nvidia.com/blog).
 - Order new non-guaranteed requests by the per-WP fair-share factor `F =
-  2^(-U/S)`, and within a package by the member's own decayed usage. The one
-  guaranteed single-GPU session per member is exempt from this ordering and is
-  always served.
+  2^(-U/S)`, and within a package by the member's own decayed usage. This
+  factor is the Slurm classic fair-share formula, in production per lab at
+  Harvard FASRC and per account at the KU cluster. The one guaranteed
+  single-GPU session per member is exempt from this ordering and is always
+  served. Exempting the guaranteed interactive tier from fair-share
+  accounting is the FASRC `gpu_test` model.
 - Renormalize the target shares `S` over the working packages that have live
   demand. This is a measured requirement, not a detail: WP4 consumed nothing
   in the real month, so a fixed 30/30/30/10 target makes every fair-share
@@ -237,6 +256,9 @@ only by consensus, time-boxed.
 
 Reserve part of the farm for a specific use case only by consensus and
 time-boxed, as a labelled, tainted node set exposed through a dedicated queue.
+Reservations gated behind PI approval and time-boxed are the norm at Utah CHPC
+(PI request, allocation must cover the reservation) and Caltech HPC (max 2
+weeks, 3 per year).
 
 ## 6. Evidence that this works on the real trace
 
@@ -276,7 +298,9 @@ admission webhook and an idle-culling alert, so the pieces are in class.
   `nominalQuota` is the WP guaranteed share, `borrowingLimit` and
   `lendingLimit` bound greedy tenants, `fairSharing.enable: true` gives the
   weighted dominant-resource-share ordering, and `reclaimWithinCohort` lets a
-  WP take back its guarantee. This is the k8s realization of 4.5 and 4.6.
+  WP take back its guarantee. This is the k8s realization of 4.5 and 4.6. The
+  guaranteed-quota-plus-over-quota-fair-share model it implements is the one
+  NVIDIA Run:ai runs in production, open-sourced as the KAI Scheduler.
 - Batch walltime: native Job `activeDeadlineSeconds` from the declared time,
   plus `ttlSecondsAfterFinished` for cleanup.
 - One interactive session per member with swap: a validating webhook plus a
