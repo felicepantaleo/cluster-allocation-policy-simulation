@@ -362,103 +362,14 @@ holds a GPU pod partly to keep a foothold in the cluster (57 of 112 users ran
 more than one pod at once). A free shared entry point removes that reason, so
 GPU pods are held only for GPU work.
 
-## 6. Evidence that this works on the real trace
 
-The proposed policy is implemented in the replay as column `ngt_proposal`
-(`clustersim/policies/fair_share_lease.py`): one free GPU per member served
-first and never charged, every GPU beyond it charged on held time and ordered
-by the WP fair-share factor `F = 2^(-U/S)` over a 7-day half-life window, no
-reclaim and no batching. Replayed on the measured month against the current
-policy (`fcfs_pending`):
 
-| metric | current (fcfs) | proposed (`ngt_proposal`) |
-|---|---|---|
-| wait p95 (min) | 965 | 0 |
-| free-GPU tier served within 15 min | 88% | 100% |
-| free-GPU requests never started | 29 | 0 |
-| requests satisfied | 95.7% | 99.2% |
-| NVL idle-held GPU-h | 37978 | 32103 |
-| longest single hold | 665 h (no cap) | 7-day renewable lease |
-
-The structural gains are visible in the replay because they do not need any
-change in user behaviour. The free-GPU guarantee is met for 100 percent of the
-866 single-GPU dev sessions with p95 wait 0 and zero never started, against 88
-percent and 29 never started under the current policy. The wait tail collapses,
-p95 965 to 0 minutes, and 99.2 percent of requests are satisfied. No other
-member's work is terminated; the only terminations are a member's own
-superseded free GPU.
-
-Two levers of this policy are economic, and the replay above holds every
-recorded behaviour constant, so it cannot show them. The held-time charge and
-the fair-share priority reduce idle holding and rebalance WP shares by making
-members release idle GPUs and move heavy work off peak. With behaviour fixed the
-replay shows only a modest idle drop (NVL 37978 to 32103 GPU-hours, from
-fair-share leaving less allocated) and no WP total-share improvement (the
-delivered-share metric is dominated by the fair-share-exempt free tier and by
-WP4's unreachable 10 percent target).
-
-To bound the pricing effect, column `ngt_proposal_behavioral` reruns the same
-policy with a modelled response: members no longer hold idle GPUs beyond the
-free one, so a multi-GPU allocation keeps only its active time. NVL idle-held
-then falls from 32103 to 14051 GPU-hours, 63 percent below the current 37978,
-and 99.5 percent of requests are satisfied. This is the upper bound of
-the effect: the charge recovers the same idle reduction as forced batching
-(`batch_multi_queue`, also 14051 NVL GPU-hours) but without the cluster
-terminating or truncating anyone's work. The real outcome sits between the two
-columns, set by how strongly members respond to the charge. Choosing pricing
-over reclaim is the bet that they respond, which is testable on the live cluster
-once the charge is visible to users.
-
-One fixed-behaviour artifact remains in both columns. One free GPU per member
-truncates the 57 of 112 members who ran several pods at once, so the "dev jobs
-done" measure falls to 47 percent. A real member would move the extra work to a
-paid lease; the fixed trace cannot model that response.
-
-## 7. Implementation on the NGT stack
-
-Assessed in `docs/implementability.md`. Nothing here is enforceable from user
-space; all of it needs cluster-admin deployment. The stack already runs an
-admission webhook and an idle-culling alert, so the pieces are in class.
-
-- Queue, per-WP quota, borrowing and reclaim: Kueue. One `ResourceFlavor` per
-  GPU model, one `ClusterQueue` per working package in one cohort.
-  `nominalQuota` is the WP guaranteed share, `borrowingLimit` and
-  `lendingLimit` bound greedy tenants, `fairSharing.enable: true` gives the
-  weighted dominant-resource-share ordering, and `reclaimWithinCohort` lets a
-  WP take back its guarantee. This is the k8s realization of 3.5 and 3.6. The
-  guaranteed-quota-plus-over-quota-fair-share model it implements is the one
-  NVIDIA Run:ai runs in production, open-sourced as the KAI Scheduler.
-- Declared duration: native Job `activeDeadlineSeconds` from the declared time,
-  plus `ttlSecondsAfterFinished` for cleanup. Renewal in 7-day steps recreates
-  the Job with a fresh deadline.
-- Multi-node gang scheduling for MPI or NCCL: Kueue all-or-nothing admission or
-  Volcano `PodGroup` `minMember`, with topology-aware scheduling to keep ranks
-  on the NVLink mesh or the RDMA fabric. Both support it (implementability.md).
-- One free GPU per member with swap: a validating webhook plus a small
-  controller that deletes the superseded free GPU. Same complexity as the
-  webhook already deployed.
-- Free-GPU single-GPU cap: `LimitRange max.nvidia.com/gpu: 1` and a
-  `ResourceQuota` on `requests.nvidia.com/gpu` in the free-tier namespace.
-- 7-day fair-share accounting: a small controller that reads the monitoring
-  backend (this study proved the data is queryable with user privileges only)
-  and feeds the decayed per-WP usage into the queue ordering.
-- Shared entry node: one node open to all members, no GPU, with a per-user
-  cgroup CPU cap and a fair-use killer. Kubernetes limits CPU per user through
-  cgroups already; the sustained-100-percent killer is the Arbiter2 model.
-
-Two constraints from the hardware and telemetry:
-
-- L40S GPUs do not support MIG (Ada Lovelace lacks the hardware). Small
-  free-tier single-GPU slices use MIG on the H100 pools; on L40S use MPS or
-  time-slicing instead.
-- The cluster exports no per-MIG-slice utilization today. Any idleness signal
-  on MIG sessions is blind until DCGM MIG profiling is enabled. Full-GPU pools
-  are fully covered. This is the one hard telemetry gap.
 
 ## 8. Parameters for the PMC to fix
 
 - N, the number of GPUs reserved for the free tier, and its split between full
   GPUs and MIG slices.
+- S per WP should be based on budget allocated to person power in the project. 
 - The idle-reclaim timeout for the free GPU.
 - The maximum allocation duration (proposed 7 days) and the default when a
   request omits it (proposed 8 hours).
@@ -471,7 +382,7 @@ Two constraints from the hardware and telemetry:
 - The fair-share half-life. The proposal recommends 7 days, matching the
   request and the Slurm and Run:ai defaults.
 
-## 9. References
+## References
 
 Fair-share and accounting: Slurm multifactor priority, classic fair-share,
 Fair Tree, and slurm.conf (`PriorityDecayHalfLife`, `PriorityUsageResetPeriod`,
