@@ -77,6 +77,18 @@ POLICIES = {
                            "reserve": {"h100nvl": 4, "l40s": 1},
                            "multi_gpu_cap_h": 1e6,
                            "max_interactive_per_user": 1},
+    # PROPOSED policy (docs/proposal-scheduling.md): one free GPU per member
+    # (never charged, served first, swap-at-start); every GPU beyond the first
+    # charged on held time and ordered by the WP fair-share factor F=2^(-U/S)
+    # over a 7-day half-life window (member's own decayed usage breaks ties
+    # within a WP); no reclaim and no batchify, so held idle time is priced
+    # rather than removed; multi-GPU is a 7-day renewable lease replayed as the
+    # recorded hold.
+    "ngt_proposal": {"_policy": "ngt_proposal",
+                     "reserve": {"h100nvl": 4, "l40s": 1},
+                     "usage_window_h": 168.0, "halflife_h": 168.0,
+                     "multi_gpu_cap_h": 1e9,
+                     "max_interactive_per_user": 1},
 }
 
 

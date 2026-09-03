@@ -361,34 +361,47 @@ GPU pods are held only for GPU work.
 
 ## 6. Evidence that this works on the real trace
 
-Replayed on the measured month (`results/replay/comparison.md`, column
-`batch_multi_queue`, the queued WP-fair-share realization of this policy),
-against the current policy (`fcfs_pending`):
+The proposed policy is implemented in the replay as column `ngt_proposal`
+(`clustersim/policies/fair_share_lease.py`): one free GPU per member served
+first and never charged, every GPU beyond it charged on held time and ordered
+by the WP fair-share factor `F = 2^(-U/S)` over a 7-day half-life window, no
+reclaim and no batching. Replayed on the measured month against the current
+policy (`fcfs_pending`):
 
-| metric | current (fcfs) | proposed (queue + fair-share) |
+| metric | current (fcfs) | proposed (`ngt_proposal`) |
 |---|---|---|
 | wait p95 (min) | 965 | 0 |
-| 1-GPU tier served within 15 min | 88% | 100% |
-| 1-GPU sessions never started | 29 | 0 |
-| NVL idle-held GPU-h | 37978 | 14051 |
-| requests satisfied | 95.7% | 99.5% |
-| longest single GPU-hold (h) | 665 (no cap) | 7-day renewable lease |
+| free-GPU tier served within 15 min | 88% | 100% |
+| free-GPU requests never started | 29 | 0 |
+| requests satisfied | 95.7% | 99.2% |
+| NVL idle-held GPU-h | 37978 | 32103 |
+| longest single hold | 665 h (no cap) | 7-day renewable lease |
 
-The free-GPU guarantee is met for 100 percent of the 866 single-GPU dev
-sessions with zero wait, idle holding is cut by roughly two thirds, and no
-other member's work is terminated. The only terminated allocations are a
-member's own superseded free GPUs.
+The structural gains are visible in the replay because they do not need any
+change in user behaviour. The free-GPU guarantee is met for 100 percent of the
+866 single-GPU dev sessions with p95 wait 0 and zero never started, against 88
+percent and 29 never started under the current policy. The wait tail collapses,
+p95 965 to 0 minutes, and 99.2 percent of requests are satisfied. No other
+member's work is terminated; the only terminations are a member's own
+superseded free GPU.
 
-Two caveats from the replay. First, it exercised the load-bearing levers of
-this policy: a queue, the free single-GPU guarantee, per-WP fair-share, and a
-charge on held time. It did not implement the 7-day renewable lease; multi-GPU
-allocations ran to their recorded length. So the idle-holding improvement is a
-lower bound, because the lease cap would reduce held time further. Second, that
-column truncated the recorded indefinite holds, so it delivers about 47 percent
-of the "dev jobs done" measure under fixed-behaviour replay; with a declared
-duration a member checkpoints and renews, which the fixed trace cannot model.
-The artifact is fair across all intervention variants and does not change the
-ranking.
+Two levers of this policy are economic, and a fixed-behaviour replay cannot
+show them. The held-time charge and the fair-share priority reduce idle holding
+and rebalance WP shares by making users release idle GPUs and move heavy work
+off peak, but the replay holds every recorded behaviour constant. So it shows
+only a modest idle drop (NVL 37978 to 32103 GPU-hours, from fair-share leaving
+less allocated) and no WP total-share improvement (the delivered-share metric
+is dominated by the fair-share-exempt free tier and by WP4's unreachable 10
+percent target). The reclaim and batch variants (`idle_reclaim`,
+`batch_multi_queue` in the same table) cut idle mechanically to 8600 to 14000
+NVL GPU-hours, but they terminate or truncate work to do it and show a worse WP
+deviation. This policy prices idle instead of killing it, which is the stated
+preference.
+
+One fixed-behaviour artifact remains. One free GPU per member truncates the 57
+of 112 members who ran several pods at once, so the "dev jobs done" measure
+falls to 47 percent, the same as the batch variants. A real member would move
+the extra work to a paid lease; the fixed trace cannot model that response.
 
 ## 7. Implementation on the NGT stack
 
