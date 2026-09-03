@@ -41,7 +41,9 @@ users never release GPUs, so the cluster looks full while sitting idle.
 These are the principles this proposal implements, in priority order. Lower
 number wins on conflict.
 
-1. Every member can hold one interactive session of at most one GPU.
+1. Every member can hold one interactive session of at most one GPU. A member
+   who needs more interactive GPUs or nodes can get them by agreement with the
+   working-package leader, at the cost of priority.
 2. The interactive tier is reliable. A member does not have to release the
    session in the evening. A member can be confident of getting one in the
    morning.
@@ -81,8 +83,8 @@ cap is the number of members served at once.
 
 The sizing rule for NGT: reserve N GPUs for the interactive tier, cap each
 member at one, and N is the number of members served at once. N is set near
-the expected simultaneous morning demand, not the full headcount. NERSC
-reserves a fraction of the machine, not all of it.
+the expected simultaneous morning demand, not the full roster of about 130
+members. NERSC reserves a fraction of the machine, not all of it.
 
 ### 4.2 A hard walltime limit is the prerequisite for a working queue
 
@@ -200,6 +202,15 @@ only after PMC approval, time-boxed.
   `interactive` QOS model (docs.nersc.gov/jobs/policy).
 - Opening a new session supersedes the member's old one (swap at start). The
   system never terminates another member's work to make room.
+- A member who needs more than one interactive GPU, or more than one node, can
+  request it with the working-package leader's agreement. This allocation is
+  not part of the guarantee. It is charged to the working package's 7-day
+  fair-share, so it lowers the package's priority for further allocations, and
+  it yields first when the cluster fills. This is the burst-when-idle,
+  yield-when-busy tier (4.6) applied to interactive work: the WP leader gates
+  it and the fair-share cost self-limits it. It is in production as the NVIDIA
+  Run:ai over-quota tier, where in-quota work is guaranteed and over-quota work
+  is preemptible.
 - The tier is sized to be reliably available. Reserve a headroom of GPUs and
   MIG slices for it, spread over at least two physical nodes so one cordon
   does not empty it. Because most interactive work fits a MIG slice, a single
@@ -327,6 +338,8 @@ Two constraints from the hardware and telemetry:
   between full GPUs and MIG slices.
 - The idle-cull timeout for interactive sessions.
 - The batch walltime cap and its default.
+- Whether interactive allocations beyond the one-GPU guarantee need a hard cap,
+  on top of the working-package leader's agreement and the fair-share cost.
 - The fair-share target shares, and the rule for renormalizing over active
   working packages.
 - The per-model charge factors.
