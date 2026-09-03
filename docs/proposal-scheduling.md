@@ -45,9 +45,9 @@ users never release GPUs, so the cluster looks full while sitting idle.
 These are the principles this proposal implements, in priority order. Lower
 number wins on conflict.
 
-1. Every member can hold one interactive session of at most one GPU. A member
-   who needs more interactive GPUs or nodes can get them by agreement with the
-   working-package leader, at the cost of priority.
+1. Every member can hold one interactive session of at most one GPU. This
+   session has no priority cost. Interactive GPUs beyond the first are charged
+   to the working package's fair-share, so they cost priority.
 2. The interactive tier is reliable. A member does not have to release the
    session in the evening. A member can be confident of getting one in the
    morning.
@@ -210,12 +210,12 @@ only after PMC approval, time-boxed.
 - Opening a new session supersedes the member's old one (swap at start). The
   system never terminates another member's work to make room.
 - A member who needs more than one interactive GPU, or more than one node, can
-  request it with the working-package leader's agreement. This allocation is
-  not part of the guarantee. It is charged to the working package's 7-day
-  fair-share, so it lowers the package's priority for further allocations, and
-  it yields first when the cluster fills. This is the burst-when-idle,
-  yield-when-busy tier (4.6) applied to interactive work: the WP leader gates
-  it and the fair-share cost self-limits it. It is in production as the NVIDIA
+  request it. There is no gate. Only the first interactive GPU is free.
+  Interactive GPUs beyond the first are charged to the working package's 7-day
+  fair-share, so they lower the package's priority for further allocations, and
+  they yield first when the cluster fills. This is the burst-when-idle,
+  yield-when-busy tier (4.6) applied to interactive work: the fair-share cost
+  self-limits it, so no gate is needed. It is in production as the NVIDIA
   Run:ai over-quota tier, where in-quota work is guaranteed and over-quota work
   is preemptible.
 - The tier is sized to be reliably available. Reserve a headroom of GPUs and
@@ -251,10 +251,11 @@ only after PMC approval, time-boxed.
 
 ### 5.3 Accounting and priority (principles 5, 6)
 
-- Charge each delivered GPU-hour to the member's working package. Charge is
-  wall time times GPU count times a per-model factor, applied at the end,
-  which is the standard service-unit model (NERSC, OLCF, ALCF, TACC all charge
-  node-hours or GPU-hours times a per-queue factor).
+- Charge each delivered GPU-hour to the member's working package, except the
+  one guaranteed single-GPU interactive session per member, which is free.
+  Charge is wall time times GPU count times a per-model factor, applied at the
+  end, which is the standard service-unit model (NERSC, OLCF, ALCF, TACC all
+  charge node-hours or GPU-hours times a per-queue factor).
 - Account per working package over the last 7 days as a 7-day half-life decay
   (4.5), not a hard reset. A 7-day half-life is the Slurm `PriorityDecayHalfLife`
   default (slurm.schedmd.com), is run verbatim by the KU Community Cluster
@@ -371,7 +372,7 @@ Two constraints from the hardware and telemetry:
 - The idle-cull timeout for interactive sessions.
 - The batch walltime cap and its default.
 - Whether interactive allocations beyond the one-GPU guarantee need a hard cap,
-  on top of the working-package leader's agreement and the fair-share cost.
+  on top of the fair-share cost.
 - The CPU-time threshold and the kill time for the shared entry node.
 - The fair-share target shares, and the rule for renormalizing over active
   working packages.
