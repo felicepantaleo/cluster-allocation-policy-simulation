@@ -9,6 +9,10 @@ on the same trace and seed.
 Governing allocation principles: `PRINCIPLES.md` (priority-ordered).
 Phase 1 findings: `docs/phase1-findings.md`.
 
+**Scheduling proposal** (the policy to adopt, grounded in how HPC centers and
+datacenters schedule shared GPUs, with the fix demonstrated on the real
+trace): `docs/proposal-scheduling.md`.
+
 **Reproduce the whole study end to end** (collect the real cluster data from
 CERN MONIT, derive the trace, attribute users to working packages, rebuild
 every gallery plot, run the simulator and the real-trace replay, render the
