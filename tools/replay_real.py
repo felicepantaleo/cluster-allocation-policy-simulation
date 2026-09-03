@@ -89,6 +89,15 @@ POLICIES = {
                      "usage_window_h": 168.0, "halflife_h": 168.0,
                      "multi_gpu_cap_h": 1e9,
                      "max_interactive_per_user": 1},
+    # the same proposed policy WITH a modelled behavioral response to the
+    # held-time charge: members stop holding idle GPUs beyond the free one, so
+    # multi-GPU allocations shed their idle time (active envelope). This is the
+    # upper bound of the pricing effect the fixed-behaviour replay cannot show.
+    "ngt_proposal_behavioral": {"_policy": "ngt_proposal", "_batch": True,
+                                "reserve": {"h100nvl": 4, "l40s": 1},
+                                "usage_window_h": 168.0, "halflife_h": 168.0,
+                                "multi_gpu_cap_h": 1e9,
+                                "max_interactive_per_user": 1},
 }
 
 
