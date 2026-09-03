@@ -54,8 +54,8 @@ number wins on conflict.
    priority for new allocations beyond the one guaranteed session. Priority
    plus accounting together stop anyone holding resources forever, while still
    allowing multiple or larger long-lived allocations when capacity is free.
-7. Specific use cases can get a reserved slice of the farm, only after wide
-   discussion and consensus.
+7. Specific use cases can get a reserved slice of the farm, only after PMC
+   approval.
 
 ## 4. How real centers do this
 
@@ -188,7 +188,7 @@ with a taint, exposed to one team through a dedicated Kueue `ResourceFlavor`
 and `ClusterQueue`. The governance norm is explicit: Utah CHPC requires the
 PI to request it and the group allocation to cover it; Caltech caps
 reservations at 2 weeks and 3 per year. This supports principle 7: reserve
-only by consensus, time-boxed.
+only after PMC approval, time-boxed.
 
 ## 5. The proposed NGT policy
 
@@ -254,7 +254,7 @@ only by consensus, time-boxed.
 
 ### 5.4 Reservations (principle 7)
 
-Reserve part of the farm for a specific use case only by consensus and
+Reserve part of the farm for a specific use case only after PMC approval and
 time-boxed, as a labelled, tainted node set exposed through a dedicated queue.
 Reservations gated behind PI approval and time-boxed are the norm at Utah CHPC
 (PI request, allocation must cover the reservation) and Caltech HPC (max 2
