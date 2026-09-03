@@ -27,6 +27,10 @@ cluster and the replay in `results/replay/comparison.md`. Reproduction:
   allocations with DCGM data the median idle fraction is 100 percent. Only 20
   percent of GPU-idle hours carry any CPU work. Hold duration is median 8.2 h
   but p95 326 h.
+- Requests carry no maximum time. A member requests an allocation without
+  declaring how long it is needed, so nothing bounds a hold and the scheduler
+  cannot estimate when a GPU frees. This is a root gap: it is the reason the
+  cluster has no queue and no back pressure.
 - There is no back pressure on hoarding. The current policy has multi-GPU
   holds that run for weeks. The longest single multi-GPU hold in replay is
   665 h. This is the direct result of no walltime limit and no queue.
@@ -58,6 +62,9 @@ number wins on conflict.
    allowing multiple or larger long-lived allocations when capacity is free.
 7. Specific use cases can get a reserved slice of the farm, only after PMC
    approval.
+8. A shared entry node lets any member be inside the cluster without allocating
+   resources. Its cores are shared by all users. A process that pins a CPU at
+   100 percent for more than a set time is killed.
 
 ## 4. How real centers do this
 
@@ -230,9 +237,12 @@ only after PMC approval, time-boxed.
 
 - Any request for more than one GPU, or any long-running request, is a batch
   job with a declared maximum allocation time. It starts, runs, and exits at
-  the end. There is no interactive multi-GPU hold. A hard walltime on batch
-  GPU work is universal: NERSC Perlmutter 48 h, OLCF Frontier 2 to 24 h, ALCF
-  Polaris up to 72 h, JUWELS 24 h, LUMI 48 h.
+  the end. There is no interactive multi-GPU hold. The maximum time is
+  mandatory at submission; if omitted, a default cap applies. This closes the
+  present-day gap that requests carry no time at all (2). A hard walltime on
+  batch GPU work is universal: NERSC Perlmutter 48 h, OLCF Frontier 2 to 24 h,
+  ALCF Polaris up to 72 h, JUWELS 24 h, LUMI 48 h; a default when the user
+  omits the time is the Slurm `DefaultTime`.
 - A hard walltime cap with a default, requeue on timeout, and a warning signal
   before the kill so the job checkpoints. This is the standard training
   pattern and it is what makes the queue and fairness work at all (4.2). The
@@ -270,6 +280,25 @@ time-boxed, as a labelled, tainted node set exposed through a dedicated queue.
 Reservations gated behind PI approval and time-boxed are the norm at Utah CHPC
 (PI request, allocation must cover the reservation) and Caltech HPC (max 2
 weeks, 3 per year).
+
+### 5.5 Shared entry node (principle 8)
+
+Provide one shared node that any member can enter without an allocation. Its
+purpose is presence in the cluster, not computation: editing code, submitting
+batch jobs, moving data, small tasks. All cores are shared, there is no GPU and
+no reserved slot. A fair-use limit kills any process that holds a CPU at 100
+percent for more than a set time, so one user cannot degrade the node for the
+others. This is the standard HPC login node with a fair-use enforcer: every
+center runs login nodes that forbid heavy compute, and the enforcement is
+cgroups-based. The Arbiter2 tool (Utah CHPC) does exactly this: it caps each
+user's CPU share on a shared node, applies escalating penalties, and kills the
+processes of a user who keeps exceeding the limit. It runs at Utah CHPC and
+Brown OSCAR.
+
+This node also removes a driver of GPU hoarding measured on NGT: today a member
+holds a GPU pod partly to keep a foothold in the cluster (57 of 112 users ran
+more than one pod at once). A free shared entry point removes that reason, so
+GPU pods are held only for GPU work.
 
 ## 6. Evidence that this works on the real trace
 
@@ -322,6 +351,9 @@ admission webhook and an idle-culling alert, so the pieces are in class.
 - 7-day fair-share accounting: a small controller that reads the monitoring
   backend (this study proved the data is queryable with user privileges only)
   and feeds the decayed per-WP usage into the queue ordering.
+- Shared entry node: one node open to all members, no GPU, with a per-user
+  cgroup CPU cap and a fair-use killer. Kubernetes limits CPU per user through
+  cgroups already; the sustained-100-percent killer is the Arbiter2 model.
 
 Two constraints from the hardware and telemetry:
 
@@ -340,6 +372,7 @@ Two constraints from the hardware and telemetry:
 - The batch walltime cap and its default.
 - Whether interactive allocations beyond the one-GPU guarantee need a hard cap,
   on top of the working-package leader's agreement and the fair-share cost.
+- The CPU-time threshold and the kill time for the shared entry node.
 - The fair-share target shares, and the rule for renormalizing over active
   working packages.
 - The per-model charge factors.
@@ -358,7 +391,8 @@ Interactive tier and reservations: NERSC Perlmutter policy and interactive
 jobs, docs.nersc.gov. ALCF Polaris, docs.alcf.anl.gov. LUMI partitions,
 docs.lumi-supercomputer.eu. JUWELS batch system, apps.fz-juelich.de. Slurm
 reservations, slurm.schedmd.com/reservations. Utah CHPC and Caltech HPC
-reservation policies.
+reservation policies. Shared entry node fair-use enforcement: Arbiter2
+(github.com/chpc-uofu/arbiter2, Utah CHPC, PEARC 2019), also at Brown OSCAR.
 
 Theory: Ghodsi et al., "Dominant Resource Fairness", NSDI 2011. Hindman et
 al., "Mesos", NSDI 2011. Verma et al., "Large-scale cluster management at
