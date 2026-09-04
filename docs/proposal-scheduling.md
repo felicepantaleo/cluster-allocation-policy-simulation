@@ -6,7 +6,7 @@ The NGT GPU cluster is a shared pool of GPU servers used by the whole project. A
 
 This proposal replaces the free-for-all with three rules that large GPU centres already use. First, every member always has one GPU, at no cost, released automatically when it sits idle. Second, any GPU beyond that first one is time-limited and costs the member's project some scheduling priority. Third, priority is shared fairly between the project's working packages (the sub-teams WP1 to WP4, across which the budget is split), based on how much each used in the last week.
 
-Nothing here is new. The same mechanisms run at national supercomputers (NERSC, ALCF, LUMI, Julich), at university clusters (Harvard FASRC, Stanford, KU), and inside commercial GPU schedulers (NVIDIA Run:ai). This document explains the problem we measured on NGT, shows that each rule is standard practice, states the policy, and shows on the real usage record that it fixes the problems.
+Nothing here is new. The same mechanisms run at national supercomputers (NERSC, ALCF, LUMI, Julich), at university clusters (Harvard FASRC, KU), and inside commercial GPU schedulers (NVIDIA Run:ai). This document explains the problem we measured on NGT, shows that each rule is standard practice, states the policy, and shows on the real usage record that it fixes the problems.
 
 ## 2. The measured problem
 
