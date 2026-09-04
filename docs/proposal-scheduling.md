@@ -1,150 +1,144 @@
-# Proposal: a fair-share scheduling policy for the NGT GPU cluster
+# Happy Cluster: a fair-share scheduling policy for the NGT GPU cluster
 
 ## 1. Summary
 
-The NGT cluster runs first come first served. A session is a bare Pod. There is no queue, no quota, and no time limit. This proposal replaces that with the policy that every large shared GPU center already runs: one free GPU per member that is always available, every GPU beyond it time-bounded and charged, and fair-share priority across the working packages accounted over a rolling window. The design is not novel. The same parts run at NERSC, Harvard FASRC, Stanford, the KU cluster, and inside NVIDIA Run:ai. This document states the policy, shows that it matches real-world practice, and shows on the measured NGT trace that it fixes the problems we recorded.
+The NGT GPU cluster is a shared pool of GPU servers used by the whole project. A member gets GPUs by starting a session, which is a container (in Kubernetes terms, a Pod). Today the cluster runs first come first served, with no controls: there is no waiting line (no queue), no limit per group (no quota), and no limit on how long a session runs (no time limit). The result is that the cluster looks full but is mostly idle, members wait a long time, and some never get a GPU.
+
+This proposal replaces the free-for-all with three rules that large GPU centres already use. First, every member always has one GPU, at no cost, released automatically when it sits idle. Second, any GPU beyond that first one is time-limited and costs the member's project some scheduling priority. Third, priority is shared fairly between the project's working packages (the sub-teams WP1 to WP4, across which the budget is split), based on how much each used in the last week.
+
+Nothing here is new. The same mechanisms run at national supercomputers (NERSC, ALCF, LUMI, Julich), at university clusters (Harvard FASRC, Stanford, KU), and inside commercial GPU schedulers (NVIDIA Run:ai). This document explains the problem we measured on NGT, shows that each rule is standard practice, states the policy, and shows on the real usage record that it fixes the problems.
 
 ## 2. The measured problem
 
-All numbers below are from the 30 to 40 day MONIT extraction of the real cluster.
+All numbers come from the cluster's own monitoring (the MONIT system), extracted over 30 to 40 days.
 
-- Demand exists and waits are long. 1948 GPU and MIG requests from 144 users in 40 days. Under the current policy the NVL pool wait is p95 930 minutes. 29 single-GPU requests never started at all.
-- Allocations are held idle. 62777 idle-held GPU-hours per month. For allocations with DCGM data the median idle fraction is 100 percent. Only 20 percent of GPU-idle hours carry any CPU work. Hold duration is median 8.2 h but p95 326 h.
-- Requests carry no maximum time. A member requests an allocation without declaring how long it is needed, so nothing bounds a hold and the scheduler cannot estimate when a GPU frees. This is a root gap: it is the reason the cluster has no queue and no back pressure.
-- There is no back pressure on hoarding. The current policy has multi-GPU holds that run for weeks. The longest single multi-GPU hold reaches 665 h. This is the direct result of no walltime limit and no queue.
-- Users hold sessions defensively. 57 of 112 users ran more than one pod at the same time, which is insurance behaviour against not getting a GPU back.
+- The demand is real and the waits are long. In 40 days there were 1948 GPU requests from 144 users. On the busiest pool (the H100 NVL GPUs) the slowest 5 percent of requests waited more than 930 minutes, about 15 hours. 29 requests for a single GPU never ran at all.
+- GPUs are held but not used. Members held 62777 GPU-hours per month without computing on them; one GPU-hour is one GPU reserved for one hour. For the allocations where we can read the GPU meter (NVIDIA's DCGM telemetry), the typical one used the GPU essentially not at all: the median fraction of idle time is 100 percent. Only 20 percent of that idle time had even the CPU busy. A typical session was held for about 8 hours, but the longest 5 percent ran past 326 hours, about two weeks.
+- Requests carry no time limit. A member asks for GPUs without saying for how long. Nothing bounds the hold, and the scheduler cannot tell when a GPU will free up. This one gap is the root cause: it is why the cluster has no working queue and nothing pushes back on over-use.
+- Nothing pushes back on hoarding. Some multi-GPU sessions ran for weeks; the longest reached 665 hours. With no time limit and no queue, this is the expected outcome.
+- Members hold GPUs defensively. 57 of 112 users ran more than one session at the same time, keeping spares in case they cannot get a GPU back later.
 
-The one line conclusion: because a user cannot be sure to get a GPU back, users never release GPUs, so the cluster looks full while sitting idle.
+The cause and effect is simple. Because a member cannot be sure of getting a GPU back, no one lets go. So the cluster looks full while sitting idle.
 
-## 3. How real centers do this
+## 3. How real centres solve each piece
 
-Before the principles, here is how large shared GPU centers already solve each piece. Every mechanism the proposal uses is standard, with a named config knob and a center that runs it. The principles in the next section draw on these. Full links are in the References.
+Before the principles, here is how large shared GPU centres already solve each part of the problem. Every mechanism in this proposal is standard, and for each we name a centre that runs it. Full links are in the References.
 
-### 3.1 A guaranteed interactive tier is a dedicated partition with a per-user cap
+### 3.1 A reliable "GPU in the morning" is a small reserved pool with a one-per-person limit
 
-The way to guarantee "a GPU in the morning" is a partition reserved for interactive work with a per-user cap of one. The partition size divided by the cap is the number of members served at once.
+To promise every member a GPU on demand, centres set aside a group of GPUs for short, interactive use, and let each person take only one at a time. The size of that pool, divided by one-per-person, is the number of people served at the same time.
 
-- NERSC Perlmutter runs an `interactive` QOS backed by a standing node reservation. It is engineered to deliver nodes within 6 minutes, and the request auto-cancels after 6 minutes if none are free, so it never queues forever and never hoards. Per-user cap 4 nodes, walltime 4 h, high priority.
-- Harvard FASRC runs a no-cost interactive tier (`gpu_test`) that is exempt from fair-share accounting, capped at 2 jobs and a short walltime.
+- NERSC (the US national centre) reserves nodes for an "interactive" queue and delivers a GPU within 6 minutes. If none is free within 6 minutes the request is dropped rather than left waiting, so the pool is never hoarded.
+- Harvard FASRC runs a free interactive queue (called `gpu_test`) that does not count against a group's fair share.
 
-The sizing rule for NGT: reserve N GPUs for the free tier, cap each member at one, and N is the number of members served at once. N is set near the expected simultaneous morning demand, not the full roster of about 130 members. NERSC reserves a fraction of the machine, not all of it.
+For NGT: reserve N GPUs for this free tier and cap each member at one, so N members are served at once. Set N near the number of people who typically want a GPU at the same time in the morning, not the full roster of about 130. Because a single interactive task usually fits on a fraction of a GPU (modern NVIDIA GPUs can be split into smaller, isolated GPUs, called MIG slices), one physical GPU can serve several people at once.
 
-### 3.2 A hard walltime limit is the prerequisite for a working queue
+### 3.2 A time limit on every job is what makes a queue work
 
-Every production GPU queue enforces a maximum walltime, and applies a default when the user omits it. Slurm states plainly that backfill "is difficult without reasonable time limit estimates" because the start time of a pending job depends on when running jobs end. With unbounded jobs a scheduler cannot estimate turnaround, so a queue degenerates back to first come first served. This is exactly the NGT failure mode.
+Every production GPU queue makes a job declare a maximum run time (its "walltime"), and fills in a default if the user does not. The reason is mechanical. To start a small job early in a gap without delaying a large job already waiting, the scheduler must know when the running jobs will finish. This gap-filling is called backfill. With no time limits the scheduler cannot predict anything, so the queue collapses back to first come first served. That is exactly the NGT situation.
 
-Real maxima: NERSC Perlmutter `regular` 48 h; OLCF Frontier 2 to 24 h by job size; ALCF Polaris `preemptable` up to 72 h; JUWELS booster 24 h; LUMI standard-g 48 h. The safe pattern is a hard cap plus a default, and requeue on timeout with a warning signal so the job can checkpoint (Slurm `--signal=TERM@120`, `--requeue`).
+Real limits at other centres run from about one to three days: NERSC 48 hours, Julich JUWELS 24 hours, LUMI 48 hours, ALCF Polaris up to 72 hours. Jobs that need longer save their state to disk at intervals (a "checkpoint") and resubmit, so a time limit never loses work.
 
-### 3.3 A declared maximum duration matters more than the interactive/batch label
+### 3.3 The time limit matters more than the "interactive" or "batch" label
 
-Many centers separate a small interactive tier from a long batch tier as distinct QOS (NERSC `interactive` short and capped vs `regular` long and exclusive; university policies cap a short queue at 1 GPU and send multi-GPU work to batch). The load-bearing part of that split is not the label but the declared time bound: every allocation carries a maximum duration, so the scheduler can pack, turn over, and account it. This proposal keeps the time bound and drops the label. Beyond the free GPU, an allocation is bounded by a declared duration and priced by the fair-share charge, whether the member calls it interactive or batch.
+Many centres keep two separate queues: a small, short, interactive one, and a large, long, batch one. The useful part of that split is not the label but the time limit that every job carries, because the time limit is what lets the scheduler plan, turn work over, and account for it. This proposal keeps the time limit and drops the label. Beyond the one free GPU, a request simply states how long it needs and pays for it in priority, whether the member is typing at it or running an unattended job.
 
-### 3.4 Idle sessions are culled, and the workspace is kept
+### 3.4 An idle interactive session is stopped automatically, and its work is kept
 
-Every managed interactive platform culls idle sessions. The important property is that culling frees the GPU but preserves the workspace, so the user loses no data. Signals and typical values:
+Every interactive platform stops sessions that sit idle, and, importantly, it keeps the user's files. NVIDIA Run:ai stops a session when its GPU has been idle (near-zero use) for a set time. Kubeflow and JupyterHub stop an idle notebook but keep its disk (the "persistent volume"), so the user loses nothing and simply reopens the session later. For NGT the natural idle signal is GPU use near zero, which we already measure, with a timeout long enough to survive overnight so that a paused-but-owned session is not stopped too soon.
 
-- Kubeflow Notebooks: `ENABLE_CULLING`, `CULL_IDLE_TIME` (default 1440 min), signal is kernel activity; culling scales the pod to zero but keeps the PVC.
-- JupyterHub idle culler: `cull.timeout` (common default 3600 s), `cull.maxAge` for a hard cap.
-- NVIDIA Run:ai: idle GPU time limit per workload type, signal is GPU utilization measured in 30 s windows.
+### 3.5 Charge each project, count only the last week, and lower the priority of heavy users
 
-For NGT the right signal is GPU utilization near zero (we already extract this from DCGM on full GPUs), with a timeout long enough to survive overnight so an owned-but-idle session is not killed too early.
+The standard way to share fairly between groups is a "fair-share" rule. Give each project a target share of the machine. Track how much it actually used recently. The more it used, the lower the priority of its next request; as it eases off, its priority recovers.
 
-### 3.5 Accounting per project over a rolling window, priority falls with usage
+Slurm, the most common HPC scheduler, writes this as a priority score `F = 2^(-U/S)`. Here `U` is the project's recent usage as a fraction of the total, and `S` is its target fraction. If a project used exactly its target, `F = 0.5`. If it used less, `F` rises above 0.5 and the project goes first. If it used more, `F` falls toward 0 and the project waits.
 
-Usage-based fair-share is the standard way to make priority fall as a group consumes more. It is the Slurm fair-share factor.
+"Recent" is set by a half-life. Usage right now counts in full; usage a week ago counts half; two weeks ago a quarter. Slurm's default half-life is exactly 7 days. A smooth decay is better than wiping the record clean every week, because a hard weekly reset lets people time their large jobs for just after the reset.
 
-- The classic fair-share factor is `F = 2^(-U/S)`, where `U` is the normalized decayed usage of the account and `S` is its assigned share. When usage equals share, `F = 0.5`. Under-use gives `F` above 0.5. Over-use drives `F` toward 0. So the more a working package used recently, the lower the priority of its next request. The proposal adopts this as its priority rule.
-- The "last 7 days" is a standard knob. Slurm `PriorityDecayHalfLife` defaults to exactly 7 days: usage now counts full, at 7 days half, at 14 days a quarter.
-- A decayed window is preferred over a hard 7-day reset. A hard reset creates a cliff: at the reset instant every project's usage jumps to zero, the order flips, and users time submissions around the boundary. Exponential decay is a rolling window with no cliff and nothing to game. Recommendation: account the "last 7 days" as a 7-day half-life decay, not a rectangular window.
-- The tree form (Slurm Fair Tree, the default) guarantees that if working package A has a higher factor than B, every member of A ranks above every member of B. A heavy package cannot interleave its users above a light package. This is what makes per-WP fairness hold across users.
-- This is in production for GPUs today. The KU cluster runs `f = 2^(-usage/shares)` with a 7-day half-life. NVIDIA Run:ai time-based fair-share uses a one-week window by default. Harvard FASRC uses a 3-day half-life per lab.
+This is not theoretical. The KU cluster runs exactly this formula with a 7-day half-life. NVIDIA Run:ai uses a one-week window. Harvard FASRC uses a 3-day half-life. The underlying theory, Dominant Resource Fairness (Ghodsi et al., 2011), handles sharing several resource types at once. Because GPUs are the only scarce resource here, it reduces to simply balancing GPU-hours between projects, and it cannot be gamed by padding a request with extra CPU or memory.
 
-On the theory: the multi-resource generalization is Dominant Resource Fairness (Ghodsi et al., NSDI 2011). When GPUs are the one binding resource, which is the NGT case, DRF collapses to weighted max-min on GPU count, so we do not need the full DRF vector: equalizing weighted per-WP GPU shares gives the identical result. DRF also gives strategy-proofness, so a package cannot win more GPUs by padding its CPU or memory requests.
+### 3.6 Let a project use spare GPUs when the machine is quiet, and give them back when others need them
 
-### 3.6 Burst when idle, yield when busy
+When the cluster is empty, a project should be able to run more than its share. When others arrive, it should give those extra GPUs back first. This "use it while it is free" idea is how every large operator runs. Google's Borg system protects production jobs and stops opportunistic ones first when capacity is needed (Verma et al., 2015). NVIDIA Run:ai guarantees each project its quota and lets extra work run only if it can be stopped ("preempted") later. On NGT the one free GPU per member is always protected. Everything beyond it is opportunistic: the fair-share score decides who gets the spare GPUs, and who gives them back first when the cluster fills.
 
-The behaviour "keep more than one long-lived session when capacity is free, but drop in priority as your package uses more" is the guaranteed-vs-opportunistic split every hyperscaler runs. Google Borg has priority bands (production above batch above best-effort); production is never preempted by production, best-effort runs in reclaimed slack and is killed first when production needs it (Verma et al., EuroSys 2015). NVIDIA Run:ai is the closest match to this proposal: deserved quota is guaranteed and non-preemptible, over quota is only for preemptible workloads, and when a project below its share needs GPUs the scheduler preempts over-quota work newest first.
+### 3.7 A slice can be set aside for a special need, but only by agreement
 
-Mapping to NGT: the one free GPU per member is the protected tier (never preempted). Extra concurrent or larger allocations are opportunistic and run while GPUs are free. The fair-share factor sets the order in which those opportunistic allocations are admitted and, if the cluster fills, the order in which they yield.
-
-### 3.7 Reservations for specific use cases, by consensus
-
-Centers reserve a slice for a group or an event, and they gate it behind approval. Slurm `scontrol create reservation` scopes nodes to named accounts or users, with recurring flags. On Kubernetes the same is a labelled node set with a taint, exposed to one team through a dedicated Kueue `ResourceFlavor` and `ClusterQueue`. The governance norm is explicit: Utah CHPC requires the PI to request it and the group allocation to cover it; Caltech limits a reservation to 2 weeks at a time, longer by approval. So a reserved slice should be gated the same way: only after PMC approval, and time-boxed.
+Centres can reserve part of the machine for a project or an event, and they always require approval first. Slurm reserves named servers for named groups. On our system (Kubernetes) the same is done by labelling a set of servers for one team. Utah and Caltech both require a formal request and time-box it (Caltech allows two weeks at a time, longer by approval). NGT should do the same: reserve a slice only after PMC approval, and only for a fixed period.
 
 ## 4. Design principles
 
-These are the principles this proposal implements, in priority order. Lower number wins on conflict.
+These are the rules this proposal implements, in priority order. When two conflict, the lower number wins.
 
-1. Every member can hold one GPU at no priority cost, the free GPU. The member does not have to release it in the evening and can be confident of getting one in the morning. The work on it can be interactive or batch.
-2. Every GPU beyond that first free one is charged to the working package's fair-share, so it costs priority for all members of the package.
-3. The free GPU is reclaimed automatically after an idle period.
-4. Every allocation beyond the first GPU declares a maximum duration, at most 7 days, defaulting to 8 hours if none is declared. It can be renewed without limit; each renewal re-competes at the working package's current priority. Whether the work is interactive or batch does not matter. An allocation can span several GPUs or several nodes, for example an MPI job.
-5. Accounting is per working package over the last 7 days.
-6. As a working package uses more in that window, its members get lower priority for new allocations beyond the one free GPU. Priority plus accounting together stop anyone holding resources forever, while still allowing multiple or larger long-lived allocations when capacity is free.
-7. Specific use cases can get a reserved slice of the farm, only after PMC approval.
-8. A shared entry node lets any member be inside the cluster without allocating resources. Its cores are shared by all users. A process that pins a CPU at 100 percent for more than a set time is killed.
+1. Every member can hold one GPU at no priority cost, the free GPU. The member does not have to release it in the evening and can be confident of getting one in the morning. The work on it can be interactive or a job.
+2. Every GPU beyond that first free one is charged to the member's working package, so it costs priority for all members of that package.
+3. The free GPU is released automatically after a period of sitting idle.
+4. Every allocation beyond the first GPU declares a maximum duration, at most 7 days, defaulting to 8 hours if none is given. It can be renewed without limit; each renewal competes again at the package's current priority. It may span several GPUs or several servers, for example a job that runs across many GPUs at once.
+5. Usage is accounted per working package over the last 7 days.
+6. The more a working package used in that window, the lower the priority its members get for new allocations beyond the one free GPU. Priority and accounting together stop anyone holding resources forever, while still allowing more or larger long-lived allocations when the cluster has room.
+7. A specific use case can get a reserved slice of the cluster, only after PMC approval.
+8. A shared entry server lets any member be inside the cluster without holding an allocation. Its cores are shared by everyone. Any process that pins a core at 100 percent for longer than a set time is stopped.
 
 ## 5. The proposed NGT policy
 
 ### 5.1 The free GPU (principles 1, 2, 3)
 
-- One free GPU per member, free of priority cost. The work on it can be interactive or batch. A validating webhook counts the member's free GPUs and rejects a second. A per-user cap of one on a dedicated free tier is the NERSC Perlmutter `interactive` QOS model.
-- A new free-GPU request supersedes the member's old one (swap at start). The system never terminates another member's work to make room.
-- The tier is sized to be reliably available. Reserve a headroom of GPUs and MIG slices for it, spread over at least two physical nodes so one cordon does not empty it. Because most single-GPU work fits a MIG slice, a single H100 serves several members. A dedicated single-GPU slice target is in production at Harvard FASRC (`gpu_test`).
-- The free GPU is reclaimed on GPU utilization near zero, with an overnight-tolerant timeout. Reclaim on GPU utilization is the NVIDIA Run:ai idle GPU time limit. Reclaim frees the GPU and keeps the user's persistent volume, so the member does not have to release it before leaving and finds one free in the morning. Scaling an idle notebook to zero while keeping its volume is the Kubeflow Notebooks culler (`CULL_IDLE_TIME`, preserves the PVC). A member who needs guaranteed uninterrupted GPU time, without the idle reclaim, uses a paid allocation with a declared duration (5.2) instead.
+- Each member may hold one free GPU, at no priority cost. The work on it can be interactive or an unattended job. An automatic admission check (a validating webhook) counts the member's free GPUs and rejects a second one.
+- Starting a new free GPU replaces the member's old one (a swap at the moment of starting). The system never stops another member's work to make room.
+- The free tier is sized to be reliably available. Set aside a headroom of GPUs and MIG slices for it, spread over at least two physical servers so that taking one server down for maintenance does not empty the tier. Because most single-GPU work fits on a MIG slice, one H100 GPU serves several members. A free single-GPU tier of this kind runs at Harvard FASRC (`gpu_test`).
+- The free GPU is released when its GPU use stays near zero for a set time, chosen long enough to survive overnight. Releasing it frees the GPU but keeps the member's saved files (the persistent volume), so the member need not release it before leaving and finds one free in the morning. This is the NVIDIA Run:ai idle-GPU timeout and the Kubeflow notebook culler. A member who needs guaranteed, uninterrupted GPU time uses a paid, time-limited allocation instead (5.2).
 
 ### 5.2 Allocations beyond the first GPU (principles 2, 4, 6)
 
-- There is no interactive-versus-batch distinction. Any allocation beyond the member's free GPU, whether a notebook or a training job, follows the same two rules: it declares a maximum duration and it costs priority.
-- An allocation can span several GPUs or several nodes, for example an MPI or NCCL job across nodes. A multi-node allocation is gang-scheduled: all its nodes are admitted together or none is, so no rank sits idle waiting for the rest. Placement is interconnect-aware, keeping the ranks on the NVLink mesh (SXM pool) or the RDMA fabric. Gang scheduling and topology-aware placement are standard: Kueue admits a workload all-or-nothing, Volcano binds a `PodGroup` by `minMember`, and both expose topology-aware scheduling for NVLink and RDMA.
-- A lease declares a duration, at most 7 days, and defaults to 8 hours if the request omits one. This closes the present-day gap that requests carry no time at all (2). A hard duration cap with a default is universal on GPU queues (NERSC Perlmutter 48 h, OLCF Frontier 2 to 24 h, ALCF Polaris up to 72 h, JUWELS 24 h, LUMI 48 h; a default is the Slurm `DefaultTime`).
-- The 7-day maximum equals the fair-share window (5.3) on purpose: a lease cannot outlast one window without renewing. A lease can be renewed without limit, and each renewal re-competes at the working package's current priority, so a package that held a lot in the last 7 days renews at a lower priority. This is what makes "no allocation forever" (principle 6) bite through cost, not through a forced kill. Renewing a bounded lease is the resubmit-after-walltime pattern every center already runs (Frontier, NERSC); requeue with a warning signal so long work checkpoints (Slurm `--requeue`, `--signal=TERM@120`; NVIDIA Run:ai documents the same for preemptible training).
-- The allocation is charged to the member's working package on held wall time (5.3), so it costs priority for every member of the package, and it yields first when the cluster fills. This is the burst-when-idle, yield-when-busy tier (3.6): the fair-share cost self-limits it, so no approval gate is needed. It is in production as the NVIDIA Run:ai over-quota tier, where in-quota work is guaranteed and over-quota work is preemptible.
+- There is no interactive-versus-job distinction. Any allocation beyond the free GPU, whether a notebook or a training run, follows the same two rules: it declares a maximum duration, and it costs priority.
+- An allocation may span several GPUs or several servers, for example a training run spread across many GPUs that must communicate (an MPI or NCCL job). A multi-server allocation is started all-or-nothing (called gang scheduling): either all its servers are granted together or none is, so no part sits idle waiting for the rest. The scheduler also places the parts close together on the fast interconnect (NVLink within a server, RDMA between servers). Standard schedulers do this: Kueue admits a workload all-or-nothing, and Volcano groups the parts with a minimum-members rule.
+- A request declares how long it needs, at most 7 days, and defaults to 8 hours if the member gives no value. This closes the present-day gap that requests carry no time at all (Section 2). A maximum plus a default is universal on GPU queues (NERSC 48 hours, ALCF Polaris up to 72 hours, and similar elsewhere).
+- The 7-day maximum equals the one-week accounting window (5.3) on purpose: an allocation cannot outlast one window without renewing. It can be renewed without limit, but each renewal competes again at the package's current priority. So a package that used a lot in the last week renews at a lower priority. This is what stops "allocations that live forever": not a forced shutdown, but a rising cost in priority. Renewing a time-limited allocation is the same "resubmit when the time runs out" pattern every centre uses, with a warning signal before the end so long work can checkpoint.
+- The allocation is charged to the member's working package for the whole time it is held, whether the GPU is busy or not (see 5.3). So holding it costs the whole package priority, and it is the first to yield when the cluster fills. This is the "use it while it is free, give it back when others need it" tier from 3.6: the priority cost limits it by itself, so no approval step is needed. It is exactly the NVIDIA Run:ai over-quota tier, where in-quota work is guaranteed and over-quota work can be stopped.
 
 ### 5.3 Accounting and priority (principles 2, 5, 6)
 
-- Charge each held GPU-hour to the member's working package, except each member's one free GPU. Charge is held wall time times GPU count times a per-model factor, the standard service-unit model (NERSC, OLCF, ALCF, TACC all charge node-hours or GPU-hours times a per-queue factor). The charge is on held time, not used time, so idle holding costs the working package priority automatically. This is the economic replacement for idle reclaim: the study measured 62777 idle-held GPU-hours per month, and charging held time prices them without the cluster having to kill anyone's allocation.
-- Account per working package over the last 7 days as a 7-day half-life decay (3.5), not a hard reset. A 7-day half-life is the Slurm `PriorityDecayHalfLife` default, is run verbatim by the KU Community Cluster, and is the NVIDIA Run:ai time-based fair-share default one-week window.
-- Order requests beyond the free GPU by the per-WP fair-share factor `F = 2^(-U/S)`, and within a package by the member's own decayed usage. This factor is the Slurm classic fair-share formula, in production per lab at Harvard FASRC and per account at the KU cluster. Each member's one free GPU is exempt from this ordering and is always served. Exempting the free single-GPU tier from fair-share accounting is the FASRC `gpu_test` model.
-- Renormalize the target shares `S` over the working packages that have live demand. This is a measured requirement, not a detail: WP4 consumed nothing in the measured month, so a fixed 30/30/30/10 target makes the fair-share ordering chase an unreachable 10 percent. Targets must renormalize over the packages with live demand.
-- The requested duration does not change the priority. Priority comes from the working package's decayed usage `U`, not from how long a request asks for. A single 7-day allocation of 2 GPUs and seven daily 24-hour allocations of 2 GPUs deliver the same 336 GPU-hours, so they charge the same and move the priority the same way. The only difference is schedulability: a shorter declared duration backfills into gaps and starts sooner on a busy cluster (3.2), so the incentive points to honest, short declarations, never to splitting for advantage. The long lease gets no free ride either: it is charged continuously on held time, so its package's priority falls during the hold, and it is preemptible when the cluster fills and its package is over share.
+- Charge each held GPU-hour to the member's working package, except each member's one free GPU. The charge is the time held, times the number of GPUs, times a per-model weight (a GPU-hour on a fast GPU counts more than on a slow one). This is the standard "service unit" used at NERSC, ALCF, and others. The charge is on the time held, not the time used, so holding a GPU idle still costs the package priority. This is the key point: it replaces "reclaiming" idle GPUs by force with a price on holding them. The 62777 idle GPU-hours per month we measured would carry a cost, without the cluster ever having to stop anyone's work.
+- Account each working package's usage over the last 7 days as a 7-day half-life decay (see 3.5), not a weekly reset. A 7-day half-life is the Slurm default, is used exactly by the KU cluster, and is the NVIDIA Run:ai one-week window.
+- Order requests beyond the free GPU by the per-package fair-share score `F = 2^(-U/S)`, and, within a package, serve the member who used least first. This is the standard Slurm fair-share formula, in use at Harvard FASRC and the KU cluster. Each member's one free GPU is outside this ordering and is always served, the same exemption FASRC gives its free `gpu_test` tier.
+- Set each package's target share `S` only over the packages that actually have demand. This matters in practice: in the measured month WP4 used nothing, so a fixed target of 30/30/30/10 would make the ordering chase a 10 percent share that no one is asking for. The targets must be renormalised over the packages with live demand.
+- The requested duration does not change the priority. Priority comes from the package's recent usage `U`, not from how long a request asks for. One 7-day request for 2 GPUs and seven daily 24-hour requests for 2 GPUs deliver the same 336 GPU-hours, so they cost the same priority. The only difference is that a shorter request is easier to fit into a gap and so tends to start sooner (see backfill, 3.2). This rewards honest, short requests and gives no advantage to splitting a job up. A long request gets no free ride either: it is charged the whole time it is held, so its package's priority keeps falling while it runs, and it is the first to yield when the cluster fills and its package is over its share.
 
 What `U` and `S` are, and how to set them for NGT:
 
-- `S` is the target share of each working package: the PMC split (WP1 30, WP2 30, WP3 30, WP4 10), renormalized over the packages with live demand in the window so the shares sum to 1. With WP4 idle, the active split is WP1, WP2, WP3 at 0.333 each.
-- `U` is the package's measured share of delivered GPU-hours over the last 7 days, with the 7-day half-life weighting, normalized so it sums to 1 across packages. The free GPU and the excluded pools (STEAM T4) do not enter `U`. Each charge is held wall time times GPU count times the per-model factor, weighted by `2^(-age / 7 days)`, and summed per package.
+- `S` is each working package's target share. As an example, a split of 30/30/30/10 across WP1 to WP4, renormalised over the packages with live demand so the shares add to 1. With WP4 idle, the active split is WP1, WP2, WP3 at 0.333 each. The real split should follow the budget or person-power assigned to each package.
+- `U` is each package's share of the GPU-hours actually delivered in the last 7 days, with the 7-day half-life weighting, normalised so the shares add to 1. The free GPU and the excluded pools (the STEAM Academy training GPUs) are left out of `U`.
 - Recompute both every few minutes (Slurm recomputes every 5 minutes by default).
 
-Worked example on the measured month. Over the real window WP3 ran heavy: its delivered share was about 0.37 against a 0.30 target. Take a 7-day snapshot with active shares `S = 0.333` each and normalized usage `U` = {WP1 0.28, WP2 0.30, WP3 0.42}:
+A worked example, using the measured month. In that month WP3 ran heavy: it took about 0.37 of the delivered GPU-hours against a 0.30 target. Take a snapshot with equal targets `S = 0.333` and recent usage `U` of {WP1 0.28, WP2 0.30, WP3 0.42}:
 
-| WP | S | U | F = 2^(-U/S) |
+| Working package | Target S | Recent usage U | Priority score F = 2^(-U/S) |
 |---|---|---|---|
 | WP1 | 0.333 | 0.28 | 0.56 |
 | WP2 | 0.333 | 0.30 | 0.54 |
 | WP3 | 0.333 | 0.42 | 0.42 |
 
-A new request from WP1, under its share, outranks one from WP3, over its share, by 0.56 to 0.42. So WP3's heavier recent use puts its next request behind WP1 and WP2. As WP3 stops consuming, its `U` decays with the 7-day half-life and its factor climbs back. The free GPU is exempt, so a member of WP3 still gets one GPU at once with no wait. The numbers here are illustrative; the real `U` is computed from the trace.
+A new request from WP1, which is under its share, beats one from WP3, which is over its share, by 0.56 to 0.42. So WP3's heavier recent use puts its next request behind WP1 and WP2. As WP3 slows down, its `U` decays over the following week and its score climbs back. The free GPU is exempt, so a member of WP3 still gets one GPU with no wait. These numbers are only an illustration; the real `U` is computed from the usage record.
 
 ### 5.4 Reservations (principle 7)
 
-Reserve part of the farm for a specific use case only after PMC approval and time-boxed, as a labelled, tainted node set exposed through a dedicated queue. Reservations gated behind PI approval and time-boxed are the norm at Utah CHPC (PI request, allocation must cover the reservation) and Caltech HPC (2 weeks at a time, longer by approval).
+Reserve part of the cluster for a specific use case only after PMC approval, and only for a fixed period. In practice this is a set of servers labelled for one team and reachable only through that team's queue. Requiring approval and a time limit is the norm at Utah CHPC (the group's leader must request it, and the group's allocation must cover it) and Caltech (two weeks at a time, longer by approval).
 
-### 5.5 Shared entry node (principle 8)
+### 5.5 Shared entry server (principle 8)
 
-Provide one shared node that any member can enter without an allocation. Its purpose is presence in the cluster, not computation: editing code, submitting batch jobs, moving data, small tasks. All cores are shared, there is no GPU and no reserved slot. A fair-use limit kills any process that holds a CPU at 100 percent for more than a set time, so one user cannot degrade the node for the others. This is the standard HPC login node with a fair-use enforcer: every center runs login nodes that forbid heavy compute, and the enforcement is cgroups-based. The Arbiter2 tool (Utah CHPC) does exactly this: it caps each user's CPU share on a shared node, applies escalating penalties, and kills the processes of a user who keeps exceeding the limit. It runs at Utah CHPC and Brown OSCAR.
+Provide one shared server that any member can log in to without holding an allocation. Its purpose is to be inside the cluster, not to compute: editing code, submitting jobs, moving data, small tasks. Its cores are shared by everyone, it has no GPU, and it reserves nothing. A fair-use limit stops any process that pins a core at 100 percent for longer than a set time, so one person cannot slow the server for everyone else. This is the standard "login node" that every centre runs, with the usual protection that heavy compute is not allowed there. The Arbiter2 tool (from Utah) does exactly this: it caps each user's share of the cores, warns, and then stops the processes of anyone who keeps going over. It runs at Utah and at Brown.
 
-This node also removes a driver of GPU hoarding measured on NGT: today a member holds a GPU pod partly to keep a foothold in the cluster (57 of 112 users ran more than one pod at once). A free shared entry point removes that reason, so GPU pods are held only for GPU work.
+This server also removes one cause of GPU hoarding we measured: today a member holds a GPU session partly just to keep a foothold in the cluster (57 of 112 users ran more than one session at once). A free place to be inside the cluster removes that reason, so GPU sessions are held only for GPU work.
 
 ## 6. Parameters for the PMC to fix
 
-- N, the number of GPUs reserved for the free tier, and its split between full GPUs and MIG slices.
-- The target share `S` per WP, based on the budget allocated to person power in the project.
-- The idle-reclaim timeout for the free GPU.
-- The maximum allocation duration (proposed 7 days) and the default when a request omits it (proposed 8 hours).
-- Whether allocations beyond the one free GPU need a hard cap on GPU count, on top of the fair-share cost.
-- The CPU-time threshold and the kill time for the shared entry node.
-- The rule for renormalizing the target shares over the working packages with live demand.
-- The per-model charge factors.
+- N, the number of GPUs reserved for the free tier, and how it is split between full GPUs and MIG slices.
+- The target share `S` per working package, based on the budget or person-power assigned to each.
+- How long a free GPU may sit idle before it is released.
+- The maximum allocation duration (proposed: 7 days) and the default when a request gives none (proposed: 8 hours).
+- Whether allocations beyond the one free GPU also need a hard cap on the number of GPUs, on top of the priority cost.
+- The CPU-time threshold and the timeout for the shared entry server.
+- The rule for renormalising the target shares over the packages with live demand.
+- The per-model GPU-hour weights.
 - The fair-share half-life. The proposal recommends 7 days, matching the Slurm and Run:ai defaults.
 
 ## 7. References
@@ -154,12 +148,12 @@ Fair-share and accounting:
 - Slurm multifactor priority: https://slurm.schedmd.com/priority_multifactor.html
 - Slurm classic fairshare algorithm: https://slurm.schedmd.com/classic_fair_share.html
 - Slurm Fair Tree algorithm: https://slurm.schedmd.com/fair_tree.html
-- Slurm slurm.conf (PriorityDecayHalfLife, PriorityUsageResetPeriod, TRESBillingWeights): https://slurm.schedmd.com/slurm.conf.html
+- Slurm configuration (PriorityDecayHalfLife, PriorityUsageResetPeriod, TRESBillingWeights): https://slurm.schedmd.com/slurm.conf.html
 - KU Community Cluster fairshare, 7-day half-life: https://docs.crc.ku.edu/how-to/fairshare-priority/
 - NVIDIA Run:ai time-based fairshare, one-week window: https://developer.nvidia.com/blog/ensuring-balanced-gpu-allocation-in-kubernetes-clusters-with-time-based-fairshare/
 - Harvard FASRC fairshare and job accounting: https://docs.rc.fas.harvard.edu/kb/fairshare/
 
-Interactive tier, walltime, and reservations:
+Interactive tier, time limits, and reservations:
 
 - NERSC Perlmutter queues and charges: https://docs.nersc.gov/jobs/policy/
 - NERSC interactive jobs: https://docs.nersc.gov/jobs/interactive/
@@ -170,9 +164,9 @@ Interactive tier, walltime, and reservations:
 - Utah CHPC general cluster policies: https://www.chpc.utah.edu/documentation/policies/2.1GeneralHPCClusterPolicies.php
 - Caltech HPC reservations: https://www.hpc.caltech.edu/documentation/faq/how-do-i-go-about-getting-a-reservation-on-the-cluster
 
-Shared entry node:
+Shared entry server:
 
-- Arbiter2, cgroups login-node governor (Utah CHPC): https://github.com/chpc-uofu/arbiter2
+- Arbiter2, cgroups login-node governor (Utah): https://github.com/chpc-uofu/arbiter2
 - Arbiter2 at Brown OSCAR: https://docs.ccv.brown.edu/oscar/connecting-to-oscar/ssh/arbiter2
 
 Theory:
@@ -191,5 +185,5 @@ Kubernetes enforcement:
 - NVIDIA k8s device plugin, MIG, time-slicing, MPS: https://github.com/NVIDIA/k8s-device-plugin
 - NVIDIA GPU Operator: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html
 - Kubernetes Dynamic Resource Allocation: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/
-- Kubeflow notebook culling, ENABLE_CULLING and CULL_IDLE_TIME: https://awslabs.github.io/kubeflow-manifests/docs/deployment/configure-notebook-culling/
+- Kubeflow notebook culling (ENABLE_CULLING, CULL_IDLE_TIME): https://awslabs.github.io/kubeflow-manifests/docs/deployment/configure-notebook-culling/
 - JupyterHub idle culler: https://github.com/jupyterhub/jupyterhub-idle-culler
