@@ -6,7 +6,7 @@ The NGT GPU cluster is a shared pool of GPU servers used by the whole project. A
 
 This proposal replaces the free-for-all with three rules that large GPU centres already use. First, every member always has one GPU, at no cost, released automatically when it sits idle. Second, any GPU beyond that first one is time-limited and costs the member's project some scheduling priority. Third, priority is shared fairly between the project's working packages (the sub-teams WP1 to WP4, across which the budget is split), based on how much each used in the last week.
 
-Nothing here is new. The same mechanisms run at national supercomputers, at university HPC clusters, and inside commercial GPU schedulers. This document explains the problem we measured on NGT, shows that each rule is standard practice, states the policy, and shows on the real usage record that it fixes the problems.
+Nothing here is new. The same mechanisms run at national supercomputers, at university HPC clusters, and inside commercial GPU schedulers. This document explains the problem we measured on NGT, states the policy, and shows on the real usage record that it fixes the problems. Appendix A documents that each rule is already standard practice at other centres. Numbers in square brackets point to the References.
 
 ## 2. The measured problem
 
@@ -20,52 +20,7 @@ All numbers come from the cluster's own monitoring (the MONIT system), extracted
 
 The cause and effect is simple. Because a member cannot be sure of getting a GPU back, no one lets go. So the cluster looks full while sitting idle.
 
-## 3. How real centres solve each piece
-
-Before the principles, here is how large shared GPU centres already solve each part of the problem. Every mechanism in this proposal is standard, and for each we cite a centre that runs it. Citations refer to the numbered bibliography in Section 7.
-
-### 3.1 A reliable "GPU in the morning" is a small reserved pool with a one-per-person limit
-
-To promise every member a GPU on demand, centres set aside a group of GPUs for short, interactive use, and let each person take only one at a time. The size of that pool, divided by one-per-person, is the number of people served at the same time.
-
-- NERSC (the US national centre) reserves nodes for an interactive queue and delivers a GPU within 6 minutes. If none is free within 6 minutes the request is dropped rather than left waiting, so the pool is never hoarded [8, 9].
-- Harvard FASRC runs a free interactive queue that does not count against a group's fair share [7].
-
-For NGT: reserve N GPUs for this free tier and cap each member at one, so N members are served at once. Set N near the number of people who typically want a GPU at the same time in the morning, not the full roster of about 130. Because a single interactive task usually fits on a fraction of a GPU (modern NVIDIA GPUs can be split into smaller, isolated GPUs, called MIG slices), one physical GPU can serve several people at once.
-
-### 3.2 A time limit on every job is what makes a queue work
-
-Every production GPU queue makes a job declare a maximum run time (its "walltime"), and fills in a default if the user does not [1]. The reason is mechanical. To start a small job early in a gap without delaying a large job already waiting, the scheduler must know when the running jobs will finish. This gap-filling is called backfill. With no time limits the scheduler cannot predict anything, so the queue collapses back to first come first served. That is exactly the NGT situation.
-
-Real limits at other centres run from one to three days, that is 24 to 72 hours [8, 10, 11, 12]. Jobs that need longer save their state to disk at intervals (a "checkpoint") and resubmit, so a time limit never loses work.
-
-### 3.3 The time limit matters more than the "interactive" or "batch" label
-
-Many centres keep two separate queues: a small, short, interactive one, and a large, long, batch one. The useful part of that split is not the label but the time limit that every job carries, because the time limit is what lets the scheduler plan, turn work over, and account for it. This proposal keeps the time limit and drops the label. Beyond the one free GPU, a request simply states how long it needs and pays for it in priority, whether the member is typing at it or running an unattended job.
-
-### 3.4 An idle interactive session is stopped automatically, and its work is kept
-
-Every interactive platform stops sessions that sit idle, and, importantly, it keeps the user's files. One product stops a session when its GPU has been idle for a set time [6]. Notebook platforms stop an idle notebook but keep its disk (the "persistent volume"), so the user loses nothing and simply reopens the session later [29, 30]. For NGT the natural idle signal is GPU use near zero, which we already measure, with a timeout long enough to survive overnight so that a paused-but-owned session is not stopped too soon.
-
-### 3.5 Charge each project, count only the last week, and lower the priority of heavy users
-
-The standard way to share fairly between groups is a "fair-share" rule. Give each project a target share of the machine. Track how much it actually used recently. The more it used, the lower the priority of its next request; as it eases off, its priority recovers.
-
-Slurm, the most common HPC scheduler, writes this as a priority score `F = 2^(-U/S)` [1, 2]. Here `U` is the project's recent usage as a fraction of the total, and `S` is its target fraction. If a project used exactly its target, `F = 0.5`. If it used less, `F` rises above 0.5 and the project goes first. If it used more, `F` falls toward 0 and the project waits. A tree form of the rule keeps this ordering consistent from projects down to individual members [3].
-
-"Recent" is set by a half-life. Usage right now counts in full; usage a week ago counts half; two weeks ago a quarter. The common default half-life is exactly 7 days [4]. A smooth decay is better than wiping the record clean every week, because a hard weekly reset lets people time their large jobs for just after the reset.
-
-This is not theoretical. It runs in production for GPUs today, from a 7-day half-life on the KU cluster [5], to a one-week window in a commercial scheduler [6], to a 3-day half-life at Harvard FASRC [7]. The underlying theory, Dominant Resource Fairness [18], handles sharing several resource types at once; because GPUs are the only scarce resource here, it reduces to simply balancing GPU-hours between projects, and it cannot be gamed by padding a request with extra CPU or memory. Fair scheduling of shared GPU clusters is an active research field [20, 21, 22].
-
-### 3.6 Let a project use spare GPUs when the machine is quiet, and give them back when others need them
-
-When the cluster is empty, a project should be able to run more than its share. When others arrive, it should give those extra GPUs back first. This "use it while it is free" idea is how every large operator runs. Google's Borg system protects production jobs and stops opportunistic ones first when capacity is needed [19]. Commercial GPU schedulers guarantee each project its quota and let extra work run only if it can be stopped ("preempted") later [6]. On NGT the one free GPU per member is always protected. Everything beyond it is opportunistic: the fair-share score decides who gets the spare GPUs, and who gives them back first when the cluster fills.
-
-### 3.7 A slice can be set aside for a special need, but only by agreement
-
-Centres can reserve part of the machine for a project or an event, and they always require approval first [13]. On our system (Kubernetes) this is done by labelling a set of servers for one team. Two centres require a formal request and time-box the reservation, for example to two weeks at a time [14, 15]. NGT should do the same: reserve a slice only after PMC approval, and only for a fixed period.
-
-## 4. Design principles
+## 3. Design principles
 
 These are the rules this proposal implements, in priority order. When two conflict, the lower number wins.
 
@@ -78,30 +33,30 @@ These are the rules this proposal implements, in priority order. When two confli
 7. A specific use case can get a reserved slice of the cluster, only after PMC approval.
 8. A shared entry server lets any member be inside the cluster without holding an allocation. Its cores are shared by everyone. Any process that pins a core at 100 percent for longer than a set time is stopped.
 
-## 5. The proposed NGT policy
+## 4. The proposed NGT policy
 
-### 5.1 The free GPU (principles 1, 2, 3)
+### 4.1 The free GPU (principles 1, 2, 3)
 
 - Each member may hold one free GPU, at no priority cost. The work on it can be interactive or an unattended job. An automatic admission check (a validating webhook) counts the member's free GPUs and rejects a second one.
 - Starting a new free GPU replaces the member's old one (a swap at the moment of starting). The system never stops another member's work to make room.
-- The free tier is sized to be reliably available. Set aside a headroom of GPUs and MIG slices for it, spread over at least two physical servers so that taking one server down for maintenance does not empty the tier. Because most single-GPU work fits on a MIG slice, one H100 GPU serves several members; on our cluster MIG and its smaller variants are managed by standard components [26, 27, 28]. A free single-GPU tier of this kind runs at Harvard FASRC [7].
-- The free GPU is released when its GPU use stays near zero for a set time, chosen long enough to survive overnight. Releasing it frees the GPU but keeps the member's saved files (the persistent volume), so the member need not release it before leaving and finds one free in the morning. This is the same idle-GPU timeout and notebook culling that other platforms run [6, 29]. A member who needs guaranteed, uninterrupted GPU time uses a paid, time-limited allocation instead (5.2).
+- The free tier is sized to be reliably available. Set aside a headroom of GPUs and MIG slices for it, spread over at least two physical servers so that taking one server down for maintenance does not empty the tier. Because most single-GPU work fits on a fraction of a GPU (a MIG slice, one of the smaller isolated GPUs that a modern NVIDIA GPU can be split into), one H100 GPU serves several members; on our cluster these slices are managed by standard components [26, 27, 28]. A free single-GPU tier of this kind runs at Harvard FASRC [7].
+- The free GPU is released when its GPU use stays near zero for a set time, chosen long enough to survive overnight. Releasing it frees the GPU but keeps the member's saved files (the persistent volume), so the member need not release it before leaving and finds one free in the morning. This is the same idle-GPU timeout and notebook culling that other platforms run [6, 29]. A member who needs guaranteed, uninterrupted GPU time uses a paid, time-limited allocation instead (4.2).
 
-### 5.2 Allocations beyond the first GPU (principles 2, 4, 6)
+### 4.2 Allocations beyond the first GPU (principles 2, 4, 6)
 
 - There is no interactive-versus-job distinction. Any allocation beyond the free GPU, whether a notebook or a training run, follows the same two rules: it declares a maximum duration, and it costs priority.
 - An allocation may span several GPUs or several servers, for example a training run spread across many GPUs that must communicate (an MPI or NCCL job). A multi-server allocation is started all-or-nothing (called gang scheduling): either all its servers are granted together or none is, so no part sits idle waiting for the rest. The scheduler also places the parts close together on the fast interconnect (NVLink within a server, RDMA between servers). Standard schedulers do this: one admits a workload all-or-nothing, another groups the parts with a minimum-members rule [23, 24].
 - A request declares how long it needs, at most 7 days, and defaults to 8 hours if the member gives no value. This closes the present-day gap that requests carry no time at all (Section 2). A maximum plus a default is universal on GPU queues [8, 10].
-- The 7-day maximum equals the one-week accounting window (5.3) on purpose: an allocation cannot outlast one window without renewing. It can be renewed without limit, but each renewal competes again at the package's current priority. So a package that used a lot in the last week renews at a lower priority. This is what stops "allocations that live forever": not a forced shutdown, but a rising cost in priority. Renewing a time-limited allocation is the same "resubmit when the time runs out" pattern every centre uses, with a warning signal before the end so long work can checkpoint.
-- The allocation is charged to the member's working package for the whole time it is held, whether the GPU is busy or not (see 5.3). So holding it costs the whole package priority, and it is the first to yield when the cluster fills. This is the "use it while it is free, give it back when others need it" tier from 3.6: the priority cost limits it by itself, so no approval step is needed. It is exactly the over-quota tier of a commercial scheduler, where in-quota work is guaranteed and over-quota work can be stopped [6, 25].
+- The 7-day maximum equals the one-week accounting window (4.3) on purpose: an allocation cannot outlast one window without renewing. It can be renewed without limit, but each renewal competes again at the package's current priority. So a package that used a lot in the last week renews at a lower priority. This is what stops "allocations that live forever": not a forced shutdown, but a rising cost in priority. Renewing a time-limited allocation is the same "resubmit when the time runs out" pattern every centre uses, with a warning signal before the end so long work can checkpoint.
+- The allocation is charged to the member's working package for the whole time it is held, whether the GPU is busy or not (see 4.3). So holding it costs the whole package priority, and it is the first to yield when the cluster fills. This is the "use it while it is free, give it back when others need it" tier described in Appendix A.6: the priority cost limits it by itself, so no approval step is needed. It is exactly the over-quota tier of a commercial scheduler, where in-quota work is guaranteed and over-quota work can be stopped [6, 25].
 
-### 5.3 Accounting and priority (principles 2, 5, 6)
+### 4.3 Accounting and priority (principles 2, 5, 6)
 
 - Charge each held GPU-hour to the member's working package, except each member's one free GPU. The charge is the time held, times the number of GPUs, times a per-model weight (a GPU-hour on a fast GPU counts more than on a slow one). This is the standard "service unit" used at major centres [8]. The charge is on the time held, not the time used, so holding a GPU idle still costs the package priority. This is the key point: it replaces "reclaiming" idle GPUs by force with a price on holding them. The 62777 idle GPU-hours per month we measured would carry a cost, without the cluster ever having to stop anyone's work.
-- Account each working package's usage over the last 7 days as a 7-day half-life decay (see 3.5), not a weekly reset [4, 5, 6].
+- Account each working package's usage over the last 7 days as a 7-day half-life decay (see Appendix A.5), not a weekly reset [4, 5, 6].
 - Order requests beyond the free GPU by the per-package fair-share score `F = 2^(-U/S)`, and, within a package, serve the member who used least first. This is the standard fair-share formula [2, 5, 7]. Each member's one free GPU is outside this ordering and is always served, the same exemption a free interactive tier gets elsewhere [7].
 - Set each package's target share `S` only over the packages that actually have demand. This matters in practice: in the measured month WP4 used nothing, so a fixed target of 30/30/30/10 would make the ordering chase a 10 percent share that no one is asking for. The targets must be renormalised over the packages with live demand.
-- The requested duration does not change the priority. Priority comes from the package's recent usage `U`, not from how long a request asks for. One 7-day request for 2 GPUs and seven daily 24-hour requests for 2 GPUs deliver the same 336 GPU-hours, so they cost the same priority. The only difference is that a shorter request is easier to fit into a gap and so tends to start sooner (see backfill, 3.2). This rewards honest, short requests and gives no advantage to splitting a job up. A long request gets no free ride either: it is charged the whole time it is held, so its package's priority keeps falling while it runs, and it is the first to yield when the cluster fills and its package is over its share.
+- The requested duration does not change the priority. Priority comes from the package's recent usage `U`, not from how long a request asks for. One 7-day request for 2 GPUs and seven daily 24-hour requests for 2 GPUs deliver the same 336 GPU-hours, so they cost the same priority. The only difference is that a shorter request is easier to fit into a gap and so tends to start sooner (see backfill, Appendix A.2). This rewards honest, short requests and gives no advantage to splitting a job up. A long request gets no free ride either: it is charged the whole time it is held, so its package's priority keeps falling while it runs, and it is the first to yield when the cluster fills and its package is over its share.
 
 What `U` and `S` are, and how to set them for NGT:
 
@@ -119,17 +74,17 @@ A worked example, using the measured month. In that month WP3 ran heavy: it took
 
 A new request from WP1, which is under its share, beats one from WP3, which is over its share, by 0.56 to 0.42. So WP3's heavier recent use puts its next request behind WP1 and WP2. As WP3 slows down, its `U` decays over the following week and its score climbs back. The free GPU is exempt, so a member of WP3 still gets one GPU with no wait. These numbers are only an illustration; the real `U` is computed from the usage record.
 
-### 5.4 Reservations (principle 7)
+### 4.4 Reservations (principle 7)
 
 Reserve part of the cluster for a specific use case only after PMC approval, and only for a fixed period. In practice this is a set of servers labelled for one team and reachable only through that team's queue. Requiring approval and a time limit is the norm at other centres, where the group's leader must request it, its allocation must cover it, and each reservation is limited to a fixed period such as two weeks [14, 15].
 
-### 5.5 Shared entry server (principle 8)
+### 4.5 Shared entry server (principle 8)
 
 Provide one shared server that any member can log in to without holding an allocation. Its purpose is to be inside the cluster, not to compute: editing code, submitting jobs, moving data, small tasks. Its cores are shared by everyone, it has no GPU, and it reserves nothing. A fair-use limit stops any process that pins a core at 100 percent for longer than a set time, so one person cannot slow the server for everyone else. This is the standard "login node" that every centre runs, with the usual protection that heavy compute is not allowed there. A dedicated tool does exactly this: it caps each user's share of the cores, warns, and then stops the processes of anyone who keeps going over [16, 17].
 
 This server also removes one cause of GPU hoarding we measured: today a member holds a GPU session partly just to keep a foothold in the cluster (57 of 112 users ran more than one session at once). A free place to be inside the cluster removes that reason, so GPU sessions are held only for GPU work.
 
-## 6. Parameters for the PMC to fix
+## 5. Parameters for the PMC to fix
 
 - N, the number of GPUs reserved for the free tier, and how it is split between full GPUs and MIG slices.
 - The target share `S` per working package, based on the budget or person-power assigned to each.
@@ -141,7 +96,52 @@ This server also removes one cause of GPU hoarding we measured: today a member h
 - The per-model GPU-hour weights.
 - The fair-share half-life. The proposal recommends 7 days, matching the common defaults.
 
-## 7. References
+## Appendix A. How real centres solve each piece
+
+This appendix documents how large shared GPU centres already solve each part of the problem. Every mechanism in the policy above is standard, and for each we cite a centre that runs it. Numbers in square brackets point to the References.
+
+### A.1 A reliable "GPU in the morning" is a small reserved pool with a one-per-person limit
+
+To promise every member a GPU on demand, centres set aside a group of GPUs for short, interactive use, and let each person take only one at a time. The size of that pool, divided by one-per-person, is the number of people served at the same time.
+
+- NERSC (the US national centre) reserves nodes for an interactive queue and delivers a GPU within 6 minutes. If none is free within 6 minutes the request is dropped rather than left waiting, so the pool is never hoarded [8, 9].
+- Harvard FASRC runs a free interactive queue that does not count against a group's fair share [7].
+
+The sizing rule for NGT: reserve N GPUs for this free tier and cap each member at one, so N members are served at once. Set N near the number of people who typically want a GPU at the same time in the morning, not the full roster of about 130. Because a single interactive task usually fits on a MIG slice (Section 4.1), one physical GPU serves several people at once.
+
+### A.2 A time limit on every job is what makes a queue work
+
+Every production GPU queue makes a job declare a maximum run time (its "walltime"), and fills in a default if the user does not [1]. The reason is mechanical. To start a small job early in a gap without delaying a large job already waiting, the scheduler must know when the running jobs will finish. This gap-filling is called backfill. With no time limits the scheduler cannot predict anything, so the queue collapses back to first come first served. That is exactly the NGT situation.
+
+Real limits at other centres run from one to three days, that is 24 to 72 hours [8, 10, 11, 12]. Jobs that need longer save their state to disk at intervals (a "checkpoint") and resubmit, so a time limit never loses work.
+
+### A.3 The time limit matters more than the "interactive" or "batch" label
+
+Many centres keep two separate queues: a small, short, interactive one, and a large, long, batch one. The useful part of that split is not the label but the time limit that every job carries, because the time limit is what lets the scheduler plan, turn work over, and account for it. This proposal keeps the time limit and drops the label. Beyond the one free GPU, a request simply states how long it needs and pays for it in priority, whether the member is typing at it or running an unattended job.
+
+### A.4 An idle interactive session is stopped automatically, and its work is kept
+
+Every interactive platform stops sessions that sit idle, and, importantly, it keeps the user's files. One product stops a session when its GPU has been idle for a set time [6]. Notebook platforms stop an idle notebook but keep its disk (the "persistent volume"), so the user loses nothing and simply reopens the session later [29, 30]. For NGT the natural idle signal is GPU use near zero, which we already measure, with a timeout long enough to survive overnight so that a paused-but-owned session is not stopped too soon.
+
+### A.5 Charge each project, count only the last week, and lower the priority of heavy users
+
+The standard way to share fairly between groups is a "fair-share" rule. Give each project a target share of the machine. Track how much it actually used recently. The more it used, the lower the priority of its next request; as it eases off, its priority recovers.
+
+Slurm, the most common HPC scheduler, writes this as a priority score `F = 2^(-U/S)` [1, 2]. Here `U` is the project's recent usage as a fraction of the total, and `S` is its target fraction. If a project used exactly its target, `F = 0.5`. If it used less, `F` rises above 0.5 and the project goes first. If it used more, `F` falls toward 0 and the project waits. A tree form of the rule keeps this ordering consistent from projects down to individual members [3].
+
+"Recent" is set by a half-life. Usage right now counts in full; usage a week ago counts half; two weeks ago a quarter. The common default half-life is exactly 7 days [4]. A smooth decay is better than wiping the record clean every week, because a hard weekly reset lets people time their large jobs for just after the reset.
+
+This is not theoretical. It runs in production for GPUs today, from a 7-day half-life on the KU cluster [5], to a one-week window in a commercial scheduler [6], to a 3-day half-life at Harvard FASRC [7]. The underlying theory, Dominant Resource Fairness [18], handles sharing several resource types at once; because GPUs are the only scarce resource here, it reduces to simply balancing GPU-hours between projects, and it cannot be gamed by padding a request with extra CPU or memory. Fair scheduling of shared GPU clusters is an active research field [20, 21, 22].
+
+### A.6 Let a project use spare GPUs when the machine is quiet, and give them back when others need them
+
+When the cluster is empty, a project should be able to run more than its share. When others arrive, it should give those extra GPUs back first. This "use it while it is free" idea is how every large operator runs. Google's Borg system protects production jobs and stops opportunistic ones first when capacity is needed [19]. Commercial GPU schedulers guarantee each project its quota and let extra work run only if it can be stopped ("preempted") later [6]. On NGT the one free GPU per member is always protected. Everything beyond it is opportunistic: the fair-share score decides who gets the spare GPUs, and who gives them back first when the cluster fills.
+
+### A.7 A slice can be set aside for a special need, but only by agreement
+
+Centres can reserve part of the machine for a project or an event, and they always require approval first [13]. On our system (Kubernetes) this is done by labelling a set of servers for one team. Two centres require a formal request and time-box the reservation, for example to two weeks at a time [14, 15]. NGT should do the same: reserve a slice only after PMC approval, and only for a fixed period.
+
+## References
 
 1. Slurm multifactor priority. https://slurm.schedmd.com/priority_multifactor.html
 2. Slurm classic fairshare algorithm. https://slurm.schedmd.com/classic_fair_share.html
